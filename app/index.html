@@ -138,6 +138,8 @@ nav.tabs button[aria-current="page"] { color: var(--accent); }
 .swatches input:checked + span { border-color: var(--ink); }
 .swatches input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+.check { display: flex; gap: 10px; align-items: center; font-size: 14px; padding: 4px 0; }
+.check input { width: 22px; height: 22px; accent-color: var(--accent); }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 14px); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; z-index: 30; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .progress { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
@@ -190,6 +192,67 @@ function duration(debut, fin, pause) {
   if (d <= 0) d += 1440; // vacation de nuit, fin le lendemain
   return Math.max(0, d - (Number(pause)||0));
 }
+
+/* ---------- Agenda (.ics) ---------- */
+const icsEsc = s => String(s ?? "").replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\;");
+const icsDate = s => s.replace(/-/g, "");
+const icsDT = (s, hm) => icsDate(s) + "T" + hm.replace(":", "") + "00";
+function fold(line) { const out = []; while (line.length > 72) { out.push(line.slice(0, 72)); line = " " + line.slice(72); } out.push(line); return out.join("\r\n"); }
+function vevent(kind, o) {
+  const L = ["BEGIN:VEVENT", `UID:${kind}-${o.id}@carnet-reserve`, "DTSTAMP:" + new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z",
+    "SEQUENCE:" + Math.floor(Date.now() / 1000)];
+  let alarm, summary, desc = [], loc = "";
+  if (kind === "vacation") {
+    const s = svc(o.serviceId);
+    const endDate = duration(o.debut, o.fin, 0) + (Number(o.debut.split(":")[0]) * 60 + Number(o.debut.split(":")[1])) >= 1440 ? addDays(o.date, 1) : o.date;
+    L.push("DTSTART:" + icsDT(o.date, o.debut), "DTEND:" + icsDT(endDate, o.fin));
+    summary = "Vacation réserve · " + (s?.nom || "service non renseigné");
+    loc = s?.unite || "";
+    desc.push("Durée effective : " + fmtH(duration(o.debut, o.fin, o.pause)) + (o.pause ? ` (pause ${o.pause} min)` : ""));
+    alarm = "-PT2H";
+  } else if (kind === "tir") {
+    L.push("DTSTART;VALUE=DATE:" + icsDate(o.date), "DTEND;VALUE=DATE:" + icsDate(addDays(o.date, 1)));
+    summary = "Tir · " + o.type; loc = o.lieu; alarm = "-PT15H";
+    if (o.statut === "fait") desc.push("Séance effectuée");
+  } else {
+    L.push("DTSTART;VALUE=DATE:" + icsDate(o.debut), "DTEND;VALUE=DATE:" + icsDate(addDays(o.fin || o.debut, 1)));
+    summary = "Formation · " + o.intitule; loc = o.lieu; alarm = "-PT15H";
+    if (o.statut === "annule") L.push("STATUS:CANCELLED");
+  }
+  if (o.note) desc.push(o.note);
+  L.push("SUMMARY:" + icsEsc(summary));
+  if (loc) L.push("LOCATION:" + icsEsc(loc));
+  if (desc.length) L.push("DESCRIPTION:" + icsEsc(desc.join("\n")));
+  L.push("BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(summary), "TRIGGER:" + alarm, "END:VALARM", "END:VEVENT");
+  return L.map(fold).join("\r\n");
+}
+function sendToCalendar(entries) {
+  if (!entries.length) { toast("Aucun événement à envoyer."); return; }
+  if (window.top !== window.self) { calendarHelp(); return; }
+  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Carnet de reserve//FR", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+    ...entries.map(([k, o]) => vevent(k, o)), "END:VCALENDAR"].join("\r\n");
+  const a = document.createElement("a");
+  a.href = "data:text/calendar;charset=utf-8," + encodeURIComponent(ics);
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function calendarHelp() {
+  sheetRoot.innerHTML = `<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Agenda iPhone">
+    <div class="grip"></div><div style="display:flex;flex-direction:column;gap:12px">
+    <h2>Agenda iPhone</h2>
+    <p style="margin:0">L'envoi vers l'agenda fonctionne dans la version installée du carnet, ouverte directement dans Safari. Ici, l'app est affichée dans Claude, qui bloque ce type de fichier.</p>
+    <p class="hint" style="margin:0">Ouvrez l'adresse de votre carnet dans Safari, ajoutez-la à l'écran d'accueil, puis transférez vos données avec Services → Copier la sauvegarde / Restaurer.</p>
+    <div class="actions"><div class="right"><button class="btn primary" id="cancel">Compris</button></div></div></div></div></div>`;
+  document.getElementById("scrim").addEventListener("click", e => { if (e.target.id === "scrim") closeSheet(); });
+  document.getElementById("cancel").onclick = closeSheet;
+}
+function upcomingEntries() {
+  const t = todayIso();
+  return [...db.vacations.filter(v => v.date >= t).map(v => ["vacation", v]),
+    ...db.tirs.filter(x => x.date >= t).map(x => ["tir", x]),
+    ...db.formations.filter(f => (f.fin || f.debut) >= t).map(f => ["formation", f])];
+}
+let autoCal = true;
+try { autoCal = localStorage.getItem(KEY + "-autocal") !== "0"; } catch (e) {}
 
 function sample() {
   const t = todayIso();
@@ -296,7 +359,7 @@ function renderAccueil() {
     <div class="stat"><b>${fmtH(minYear)}</b><span>Heures effectives ${y}</span></div>
   </div>
   ${calendar()}
-  <div class="section-head"><h2>À venir</h2><span class="hint">vacations, tir, formations</span></div>
+  <div class="section-head"><h2>À venir</h2><button class="btn" id="calAll">Tout ajouter à l'agenda</button></div>
   ${upcoming.length ? `<div class="list">${upcoming.map(u => u.html).join("")}</div>` : `<div class="list"><div class="empty">Rien de programmé. Touchez + pour ajouter une vacation.</div></div>`}
   ${obj ? `<div class="card"><div class="section-head"><h2>Tir ${y}</h2><span class="mono">${tirsFaits} / ${obj}</span></div>
     <div class="progress"><i style="width:${Math.min(100, tirsFaits/obj*100)}%"></i></div>
@@ -389,6 +452,11 @@ function renderServices() {
   <div class="section-head"><h2>Affectations</h2><span class="hint">touchez + pour en ajouter</span></div>
   <div class="list">${items.length ? items.join("") : `<div class="empty">Ajoutez les services où vous êtes affecté (ex. police secours, accueil…).</div>`}</div>
   <div class="card">
+    <h2>Agenda iPhone</h2>
+    <span class="hint">Chaque vacation, séance de tir ou formation peut être ajoutée à l'app Calendrier (et donc à iCloud), avec un rappel. Si vous renvoyez un événement modifié, choisissez le même calendrier pour qu'il soit mis à jour.</span>
+    <div class="actions"><button class="btn primary" id="calAll2">Ajouter tout le planning à venir</button></div>
+  </div>
+  <div class="card">
     <h2>Sauvegarde</h2>
     <span class="hint">Vos données restent sur cet appareil, dans ce navigateur. Copiez régulièrement la sauvegarde (Notes, mail à vous-même) pour ne rien perdre si les données de Safari sont effacées.</span>
     <div class="actions"><button class="btn primary" id="exportBtn">Copier la sauvegarde</button><button class="btn" id="importBtn">Restaurer</button></div>
@@ -408,10 +476,11 @@ function render() {
 /* ---------- Forms ---------- */
 const sheetRoot = document.getElementById("sheetRoot");
 function closeSheet() { sheetRoot.innerHTML = ""; }
-function openSheet(title, body, onSubmit, onDelete) {
+function openSheet(title, body, onSubmit, onDelete, kind, existing) {
   sheetRoot.innerHTML = `<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}">
     <div class="grip"></div><form id="f" novalidate><h2>${esc(title)}</h2>${body}
-    <div class="actions">${onDelete ? `<button type="button" class="btn danger" id="del">Supprimer</button>` : ""}
+    ${kind ? `<label class="check"><input type="checkbox" id="autoCal" ${autoCal ? "checked" : ""}> Ajouter à mon agenda iPhone en enregistrant</label>` : ""}
+    <div class="actions">${onDelete ? `<button type="button" class="btn danger" id="del">Supprimer</button>` : ""}${existing ? `<button type="button" class="btn" id="calOne">Agenda</button>` : ""}
       <div class="right"><button type="button" class="btn" id="cancel">Annuler</button><button class="btn primary" type="submit">Enregistrer</button></div></div>
     <div class="confirm" id="confirmDel" hidden>Supprimer définitivement ?<button type="button" class="btn danger" id="delYes">Oui, supprimer</button><button type="button" class="btn" id="delNo">Non</button></div>
     </form></div></div>`;
@@ -423,17 +492,21 @@ function openSheet(title, body, onSubmit, onDelete) {
     document.getElementById("delNo").onclick = () => { document.getElementById("confirmDel").hidden = true; };
     document.getElementById("delYes").onclick = () => { onDelete(); commit("Supprimé"); };
   }
+  if (existing) document.getElementById("calOne").onclick = () => sendToCalendar([[kind, existing]]);
   f.addEventListener("submit", e => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(f));
-    const err = onSubmit(data);
-    if (err) { toast(err); return; }
+    const res = onSubmit(data);
+    if (typeof res === "string") { toast(res); return; }
+    const box = document.getElementById("autoCal");
+    if (box) { autoCal = box.checked; try { localStorage.setItem(KEY + "-autocal", autoCal ? "1" : "0"); } catch (err) {} }
     commit("Enregistré");
+    if (box && box.checked && res) sendToCalendar([[kind, res]]);
   });
   return f;
 }
 function commit(msg) { db.example = db.example && [...db.vacations, ...db.tirs, ...db.formations, ...db.services].some(o => o.example); save(); closeSheet(); render(); toast(msg); }
-function upsert(list, obj) { const i = list.findIndex(o => o.id === obj.id); if (i >= 0) list[i] = obj; else list.push(obj); }
+function upsert(list, obj) { const i = list.findIndex(o => o.id === obj.id); if (i >= 0) list[i] = obj; else list.push(obj); return obj; }
 const opt = (v, cur, label) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(label ?? v)}</option>`;
 
 function vacationForm(v, presetDate) {
@@ -452,8 +525,8 @@ function vacationForm(v, presetDate) {
     <div class="field"><label for="vNote">Note</label><textarea id="vNote" name="note" placeholder="Équipage, mission, indicatif…">${esc(v.note)}</textarea></div>`;
   const f = openSheet(isNew ? "Nouvelle vacation" : "Modifier la vacation", body, d => {
     if (!d.date) return "Indiquez la date de la vacation.";
-    upsert(db.vacations, { ...v, ...d, pause: Number(d.pause) || 0, example: false });
-  }, isNew ? null : () => { db.vacations = db.vacations.filter(x => x.id !== v.id); });
+    return upsert(db.vacations, { ...v, ...d, pause: Number(d.pause) || 0, example: false });
+  }, isNew ? null : () => { db.vacations = db.vacations.filter(x => x.id !== v.id); }, "vacation", isNew ? null : v);
   const upd = () => { document.getElementById("vDur").textContent = fmtH(duration(f.debut.value, f.fin.value, f.pause.value)); };
   ["debut","fin","pause"].forEach(n => f[n].addEventListener("input", upd));
 }
@@ -470,8 +543,8 @@ function tirForm(t) {
     <div class="field"><label for="tNote">Note</label><textarea id="tNote" name="note" placeholder="Résultat, moniteur, convocation…">${esc(t.note)}</textarea></div>`;
   openSheet(isNew ? "Programmer un tir" : "Séance de tir", body, d => {
     if (!d.date) return "Indiquez la date de la séance.";
-    upsert(db.tirs, { ...t, ...d, example: false });
-  }, isNew ? null : () => { db.tirs = db.tirs.filter(x => x.id !== t.id); });
+    return upsert(db.tirs, { ...t, ...d, example: false });
+  }, isNew ? null : () => { db.tirs = db.tirs.filter(x => x.id !== t.id); }, "tir", isNew ? null : t);
 }
 
 function formationForm(fo) {
@@ -488,8 +561,8 @@ function formationForm(fo) {
     if (!d.intitule.trim()) return "Indiquez l'intitulé de la formation.";
     if (!d.debut) return "Indiquez la date de début.";
     if (d.fin && d.fin < d.debut) return "La date de fin précède la date de début.";
-    upsert(db.formations, { ...fo, ...d, fin: d.fin || d.debut, example: false });
-  }, isNew ? null : () => { db.formations = db.formations.filter(x => x.id !== fo.id); });
+    return upsert(db.formations, { ...fo, ...d, fin: d.fin || d.debut, example: false });
+  }, isNew ? null : () => { db.formations = db.formations.filter(x => x.id !== fo.id); }, "formation", isNew ? null : fo);
 }
 
 function serviceForm(s) {
@@ -551,6 +624,7 @@ view.addEventListener("click", e => {
   const day = e.target.closest("[data-day]"); if (day) { dayChoice(day.dataset.day); return; }
   const cal = e.target.closest("[data-cal]");
   if (cal) { let m = calMonth.m + Number(cal.dataset.cal), y = calMonth.y; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } calMonth = { y, m }; render(); return; }
+  if (e.target.id === "calAll" || e.target.id === "calAll2") { sendToCalendar(upcomingEntries()); return; }
   if (e.target.id === "clearEx") {
     db.vacations = db.vacations.filter(o => !o.example); db.tirs = db.tirs.filter(o => !o.example);
     db.formations = db.formations.filter(o => !o.example); db.services = db.services.filter(o => !o.example);
