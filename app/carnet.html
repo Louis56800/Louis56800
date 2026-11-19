@@ -314,14 +314,16 @@ function sendToCalendar(entries) {
     return;
   }
   // Depuis l'écran d'accueil, iOS ignore les fichiers : on passe par Safari ou par le menu Partager.
-  const href = new URL("agenda.html", location.href).href + "#" + utf8b64(ics);
+  const httpsUrl = new URL("agenda.html", location.href).href + "#" + utf8b64(ics);
+  // x-safari-https:// force l'ouverture dans l'app Safari (iOS 17+) au lieu du navigateur intégré.
+  const href = /^https:/.test(httpsUrl) ? "x-safari-" + httpsUrl : httpsUrl;
   const file = (() => { try { return new File([ics], "agenda.ics", { type: "text/calendar" }); } catch (e) { return null; } })();
   const canShare = !!(file && navigator.canShare && navigator.canShare({ files: [file] }));
   const n = entries.length;
   sheetRoot.innerHTML = `<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Ajouter à l'agenda">
     <div class="grip"></div><div style="display:flex;flex-direction:column;gap:12px">
     <h2>Ajouter à l'agenda</h2>
-    <p style="margin:0">${n} événement${n > 1 ? "s" : ""} prêt${n > 1 ? "s" : ""}. Safari va s'ouvrir : touchez « Ajouter tout » (ou « Ajouter au calendrier »), puis revenez au carnet.</p>
+    <p style="margin:0">${n} événement${n > 1 ? "s" : ""} prêt${n > 1 ? "s" : ""}. Safari va s'ouvrir avec un bouton « Ajouter à Calendrier ». Suivez les indications, puis revenez au carnet par son icône.</p>
     <a class="btn primary" id="calOpen" href="${esc(href)}" target="_blank" rel="noopener" style="text-align:center;text-decoration:none;display:grid;place-items:center">Ouvrir dans Safari</a>
     ${canShare ? `<button class="btn" id="calShare">Autre méthode : partager le fichier</button>
     <span class="hint">Avec « Partager », choisissez Calendrier si l'option apparaît, sinon « Enregistrer dans Fichiers », puis ouvrez le fichier dans l'app Fichiers.</span>` : ""}

@@ -6,39 +6,64 @@
 <meta name="robots" content="noindex">
 <title>Carnet</title>
 <style>
-:root { --bg: #0d1a33; --ink: #f2f5fa; --muted: #9fb0cf; --hivis: #e6c32e; color-scheme: dark; }
+:root { --bg: #0d1a33; --ink: #f2f5fa; --muted: #9fb0cf; --hivis: #e6c32e; --line: rgba(242,245,250,.25); color-scheme: dark; }
 body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink); font: 16px/1.45 -apple-system, system-ui, sans-serif;
-  display: flex; align-items: center; justify-content: center; text-align: center;
-  padding: calc(env(safe-area-inset-top, 0px) + 24px) max(20px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 24px) max(20px, env(safe-area-inset-left, 0px)); box-sizing: border-box; }
-main { max-width: 340px; display: flex; flex-direction: column; gap: 16px; align-items: center; }
+  display: flex; align-items: center; justify-content: center; text-align: center; box-sizing: border-box;
+  padding: calc(env(safe-area-inset-top, 0px) + 24px) max(20px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 24px) max(20px, env(safe-area-inset-left, 0px)); }
+main { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 14px; align-items: stretch; }
 h1 { margin: 0; font-size: 22px; }
-p { margin: 0; color: var(--muted); }
-a.btn { display: block; width: 100%; box-sizing: border-box; padding: 14px; border-radius: 12px; background: var(--hivis); color: var(--bg); font-weight: 700; text-decoration: none; }
+p, ol { margin: 0; color: var(--muted); }
+ol { text-align: left; padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; }
+ol b { color: var(--ink); }
+.btn { display: block; box-sizing: border-box; padding: 14px; border-radius: 12px; font: 600 16px/1.2 -apple-system, system-ui, sans-serif; text-decoration: none; border: 1px solid var(--line); background: transparent; color: var(--ink); }
+.btn.primary { background: var(--hivis); color: var(--bg); border-color: var(--hivis); font-weight: 700; }
+hr { border: 0; border-top: 1px solid var(--line); width: 100%; margin: 6px 0; }
+[hidden] { display: none !important; }
 </style>
 </head>
 <body>
 <main>
   <h1 id="t">Ajout à l'agenda</h1>
-  <p id="m">Touchez le bouton ci-dessous, puis « Ajouter tout » dans la fenêtre Calendrier.</p>
-  <a class="btn" id="go" href="#">Ajouter à Calendrier</a>
-  <p>Ensuite, revenez au carnet depuis l'écran d'accueil. Vous pouvez fermer cet onglet.</p>
+  <p id="count"></p>
+  <a class="btn primary" id="dl" href="#" download="agenda.ics">Ajouter à Calendrier</a>
+  <ol id="how">
+    <li>Touchez <b>Télécharger</b> si Safari le demande.</li>
+    <li>Ouvrez le fichier <b>agenda.ics</b> : touchez l'icône de téléchargement (flèche) dans la barre d'adresse, puis le fichier.</li>
+    <li>Touchez <b>Ajouter tout</b> et choisissez votre calendrier iCloud.</li>
+  </ol>
+  <hr>
+  <p>Si ça ne marche pas, essayez :</p>
+  <button class="btn" id="share" hidden>Partager le fichier</button>
+  <a class="btn" id="direct" href="#">Ouvrir directement</a>
+  <p>Revenez ensuite au carnet par son icône. Vous pouvez fermer cet onglet.</p>
 </main>
 <script>
 (function () {
   var h = location.hash.slice(1);
   // On retire aussitôt les données de l'adresse pour qu'elles ne restent pas dans l'historique.
   try { history.replaceState(null, "", location.pathname); } catch (e) {}
-  var go = document.getElementById("go");
   if (!h) {
     document.getElementById("t").textContent = "Rien à ajouter";
-    document.getElementById("m").textContent = "Relancez l'ajout depuis le carnet.";
-    go.hidden = true; go.style.display = "none"; return;
+    document.querySelector("main").innerHTML = "<h1>Rien à ajouter</h1><p>Relancez l'ajout depuis le carnet.</p>";
+    return;
   }
   var bin = atob(h.replace(/-/g, "+").replace(/_/g, "/"));
   var bytes = new Uint8Array(bin.length);
   for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   var ics = new TextDecoder().decode(bytes);
-  go.href = "data:text/calendar;charset=utf-8," + encodeURIComponent(ics);
+  var n = (ics.match(/BEGIN:VEVENT/g) || []).length;
+  document.getElementById("count").textContent = n + " événement" + (n > 1 ? "s" : "") + " à ajouter.";
+  var blob = new Blob([ics], { type: "text/calendar" });
+  document.getElementById("dl").href = URL.createObjectURL(blob);
+  document.getElementById("direct").href = "data:text/calendar;charset=utf-8," + encodeURIComponent(ics);
+  try {
+    var file = new File([ics], "agenda.ics", { type: "text/calendar" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      var sh = document.getElementById("share");
+      sh.hidden = false;
+      sh.onclick = function () { navigator.share({ files: [file] }).catch(function () {}); };
+    }
+  } catch (e) {}
 })();
 </script>
 </body>
