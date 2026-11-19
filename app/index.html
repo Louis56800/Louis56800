@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}</style>
+</head>
+<body>
+<title>Carnet de réserve</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Réserve">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one-column mobile app, sticky header, bottom tab bar, bottom-sheet forms */
+:root {
+  --bg: #eef1f5;
+  --surface: #ffffff;
+  --ink: #141b26;
+  --muted: #5d6878;
+  --line: #d6dce5;
+  --accent: #1f3d7a;
+  --accent-ink: #ffffff;
+  --accent-soft: #e2e9f6;
+  --ok: #1d7a4c;
+  --warn: #b26a00;
+  --crit: #b3261e;
+  --font-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Inter", -apple-system, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --tabbar-h: 64px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e131b; --surface: #171e2a; --ink: #e7ecf3; --muted: #9aa5b5; --line: #2a3445;
+    --accent: #8fb0f0; --accent-ink: #0e131b; --accent-soft: #1f2b40;
+    --ok: #5fc48f; --warn: #e3a64a; --crit: #ef7a72; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e131b; --surface: #171e2a; --ink: #e7ecf3; --muted: #9aa5b5; --line: #2a3445;
+  --accent: #8fb0f0; --accent-ink: #0e131b; --accent-soft: #1f2b40;
+  --ok: #5fc48f; --warn: #e3a64a; --crit: #ef7a72; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--font-body); -webkit-tap-highlight-color: transparent; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+header.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 10px; }
+.brand { font: 700 22px/1 var(--font-display); letter-spacing: .02em; text-transform: uppercase; }
+.brand small { display: block; font: 500 11px/1.2 var(--font-body); letter-spacing: .08em; color: var(--muted); text-transform: uppercase; margin-top: 3px; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 9px 14px; font-weight: 600; min-height: 42px; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.danger { color: var(--crit); }
+.btn.ghost { border-color: transparent; background: transparent; }
+.add { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--accent); color: var(--accent-ink); font-size: 26px; line-height: 1; display: grid; place-items: center; }
+
+main { padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 24px); }
+main .wrap { display: flex; flex-direction: column; gap: 18px; padding-block: 16px; }
+h2 { font: 600 20px/1.1 var(--font-display); letter-spacing: .03em; text-transform: uppercase; margin: 0; text-wrap: balance; }
+.section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.hint { color: var(--muted); font-size: 13px; }
+
+.banner { background: var(--accent-soft); border-radius: 12px; padding: 12px 14px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; font-size: 13px; }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
+.stat b { display: block; font: 600 26px/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.stat span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+
+.list { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.item { display: grid; grid-template-columns: 54px 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; border: 0; border-top: 1px solid var(--line); background: transparent; text-align: left; width: 100%; }
+.item:first-child { border-top: 0; }
+.date { text-align: center; border-right: 3px solid var(--svc, var(--line)); padding-right: 10px; }
+.date b { display: block; font: 600 24px/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.date span { font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: .05em; }
+.item .main { min-width: 0; }
+.item .t { font-weight: 600; overflow-wrap: anywhere; }
+.item .s { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13px; }
+.pill { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; padding: 4px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+.pill.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.pill.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent); }
+.pill.crit { color: var(--crit); background: color-mix(in srgb, var(--crit) 14%, transparent); }
+.empty { padding: 22px 16px; text-align: center; color: var(--muted); font-size: 14px; }
+.example { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--warn); margin-left: 6px; }
+
+/* Calendar */
+.cal { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+.cal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.cal-head b { font: 600 18px/1 var(--font-display); text-transform: uppercase; letter-spacing: .04em; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-grid .dow { font-size: 11px; color: var(--muted); text-align: center; text-transform: uppercase; padding-bottom: 2px; }
+.day { aspect-ratio: 1; max-width: 100%; border-radius: 8px; border: 1px solid transparent; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-variant-numeric: tabular-nums; font-size: 14px; padding: 0; }
+.day.out { color: var(--muted); opacity: .4; }
+.day.today { border-color: var(--accent); font-weight: 700; }
+.day.has { background: var(--accent-soft); }
+.dots { display: flex; gap: 3px; height: 6px; }
+.dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin-right: 5px; }
+
+/* Tab bar */
+nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+nav.tabs .row { max-width: 640px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); height: var(--tabbar-h); }
+nav.tabs button { border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .02em; }
+nav.tabs button svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+nav.tabs button[aria-current="page"] { color: var(--accent); }
+
+/* Sheet */
+.scrim { position: fixed; inset: 0; background: rgb(8 12 20 / .45); z-index: 20; display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--surface); width: 100%; max-width: 640px; max-height: 92%; overflow-y: auto; border-radius: 18px 18px 0 0; padding: 18px max(16px, env(safe-area-inset-right, 0px)) calc(18px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.sheet form { display: flex; flex-direction: column; gap: 12px; }
+.sheet .grip { width: 40px; height: 4px; border-radius: 2px; background: var(--line); margin: -6px auto 6px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.field input, .field select, .field textarea { width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--bg); font-size: 16px; }
+.field textarea { min-height: 70px; resize: vertical; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.calc { background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; }
+.calc b { font: 600 22px/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.actions { display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap; margin-top: 4px; }
+.actions .right { display: flex; gap: 8px; margin-left: auto; }
+.confirm { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--crit); }
+.swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.swatches label { position: relative; }
+.swatches input { position: absolute; opacity: 0; }
+.swatches span { display: block; width: 34px; height: 34px; border-radius: 50%; background: var(--c); border: 3px solid transparent; }
+.swatches input:checked + span { border-color: var(--ink); }
+.swatches input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 14px); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; z-index: 30; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.progress { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.progress i { display: block; height: 100%; background: var(--accent); }
+textarea.backup { width: 100%; min-height: 120px; font: 12px/1.4 var(--font-mono); border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--bg); }
+@media (max-width: 380px) { .row3 { grid-template-columns: 1fr 1fr; } }
+@media (prefers-reduced-motion: no-preference) { .sheet { animation: up .22s ease-out; } @keyframes up { from { transform: translateY(30px); opacity: .6; } } }
+</style>
+
+<header class="top"><div class="wrap">
+  <div class="brand">Carnet de réserve<small id="subtitle">Réserviste opérationnel · PN</small></div>
+  <button class="add" id="addBtn" aria-label="Ajouter">+</button>
+</div></header>
+
+<main><div class="wrap" id="view"></div></main>
+
+<nav class="tabs" aria-label="Sections"><div class="row">
+  <button data-tab="accueil"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Accueil</button>
+  <button data-tab="vacations"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Vacations</button>
+  <button data-tab="tir"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>Tir</button>
+  <button data-tab="formations"><svg viewBox="0 0 24 24"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2 9 2 12 0v-5"/></svg>Formations</button>
+  <button data-tab="services"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg>Services</button>
+</div></nav>
+
+<div id="sheetRoot"></div>
+<div id="toastRoot"></div>
+
+<script>
+(() => {
+const KEY = "carnet-reserve-v1";
+const COLORS = ["#2f5fbf", "#1d8a5a", "#c2410c", "#7c3aed", "#b8860b", "#0e7490", "#be185d", "#4b5563"];
+const MOIS = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+const MOIS_C = ["janv","févr","mars","avr","mai","juin","juil","août","sept","oct","nov","déc"];
+const JOURS = ["dim","lun","mar","mer","jeu","ven","sam"];
+
+const uid = () => Math.random().toString(36).slice(2, 10);
+const pad = n => String(n).padStart(2, "0");
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parse = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); };
+const todayIso = () => iso(new Date());
+const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate()+n); return iso(d); };
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtH = min => { const h = Math.floor(min/60), m = Math.round(min%60); return `${h}h${pad(m)}`; };
+const daysUntil = s => Math.round((parse(s) - parse(todayIso())) / 86400000);
+
+function duration(debut, fin, pause) {
+  if (!debut || !fin) return 0;
+  const [h1,m1] = debut.split(":").map(Number), [h2,m2] = fin.split(":").map(Number);
+  let d = (h2*60+m2) - (h1*60+m1);
+  if (d <= 0) d += 1440; // vacation de nuit, fin le lendemain
+  return Math.max(0, d - (Number(pause)||0));
+}
+
+function sample() {
+  const t = todayIso();
+  const s1 = uid(), s2 = uid(), s3 = uid();
+  return {
+    example: true,
+    settings: { tirObjectif: 3 },
+    services: [
+      { id: s1, nom: "Police secours", unite: "CSP (exemple)", color: COLORS[0], example: true },
+      { id: s2, nom: "Accueil du public", unite: "Commissariat (exemple)", color: COLORS[1], example: true },
+      { id: s3, nom: "Sécurisation événement", unite: "DDSP (exemple)", color: COLORS[2], example: true },
+    ],
+    vacations: [
+      { id: uid(), date: addDays(t,-12), debut: "07:00", fin: "15:00", pause: 30, serviceId: s1, note: "", example: true },
+      { id: uid(), date: addDays(t,-5), debut: "13:00", fin: "21:00", pause: 30, serviceId: s2, note: "", example: true },
+      { id: uid(), date: addDays(t,3), debut: "21:00", fin: "05:00", pause: 45, serviceId: s1, note: "Vacation de nuit", example: true },
+      { id: uid(), date: addDays(t,9), debut: "08:00", fin: "18:00", pause: 60, serviceId: s3, note: "", example: true },
+    ],
+    tirs: [
+      { id: uid(), date: addDays(t,-60), lieu: "Stand de tir (exemple)", type: "Séance de tir réglementaire", statut: "fait", note: "", example: true },
+      { id: uid(), date: addDays(t,16), lieu: "Stand de tir (exemple)", type: "Séance de tir réglementaire", statut: "prevu", note: "", example: true },
+    ],
+    formations: [
+      { id: uid(), debut: addDays(t,24), fin: addDays(t,25), intitule: "Gestes techniques professionnels (exemple)", lieu: "Centre de formation", statut: "prevu", note: "", example: true },
+    ],
+  };
+}
+
+let db;
+function load() {
+  try { const raw = localStorage.getItem(KEY); if (raw) { db = JSON.parse(raw); } } catch (e) {}
+  if (!db || !db.vacations) db = sample();
+  db.settings ||= { tirObjectif: 3 };
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(db)); return true; }
+  catch (e) { toast("Enregistrement impossible sur cet appareil. Faites une sauvegarde."); return false; }
+}
+load();
+
+let tab = "accueil";
+try { tab = localStorage.getItem(KEY+"-tab") || "accueil"; } catch (e) {}
+let calMonth = (() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; })();
+
+const view = document.getElementById("view");
+const svc = id => db.services.find(s => s.id === id);
+
+function dateBlock(s, color) {
+  const d = parse(s);
+  return `<div class="date" style="--svc:${color||"var(--line)"}"><b>${d.getDate()}</b><span>${MOIS_C[d.getMonth()]}</span></div>`;
+}
+function exTag(o) { return o.example ? `<span class="example">exemple</span>` : ""; }
+
+function vacItem(v) {
+  const s = svc(v.serviceId);
+  const past = v.date < todayIso();
+  return `<button class="item" data-edit="vacation" data-id="${v.id}">
+    ${dateBlock(v.date, s?.color)}
+    <div class="main"><div class="t">${esc(s?.nom || "Service non renseigné")}${exTag(v)}</div>
+    <div class="s"><span class="mono">${v.debut}–${v.fin}</span> · ${JOURS[parse(v.date).getDay()]}${v.note ? " · " + esc(v.note) : ""}</div></div>
+    <div style="text-align:right"><div class="mono" style="font-weight:600">${fmtH(duration(v.debut, v.fin, v.pause))}</div><span class="pill ${past ? "ok" : ""}">${past ? "Effectuée" : "Prévue"}</span></div>
+  </button>`;
+}
+function tirItem(t) {
+  const st = t.statut === "fait" ? ["ok","Fait"] : t.date < todayIso() ? ["crit","À valider"] : ["warn","Prévu"];
+  const dd = daysUntil(t.date);
+  return `<button class="item" data-edit="tir" data-id="${t.id}">
+    ${dateBlock(t.date, "var(--accent)")}
+    <div class="main"><div class="t">${esc(t.type)}${exTag(t)}</div><div class="s">${esc(t.lieu)}${t.statut !== "fait" && dd >= 0 ? ` · dans ${dd} j` : ""}</div></div>
+    <span class="pill ${st[0]}">${st[1]}</span></button>`;
+}
+function formItem(f) {
+  const st = f.statut === "fait" ? ["ok","Suivie"] : f.statut === "annule" ? ["crit","Annulée"] : ["warn","Programmée"];
+  const range = f.fin && f.fin !== f.debut ? `jusqu'au ${parse(f.fin).getDate()} ${MOIS_C[parse(f.fin).getMonth()]}` : "1 jour";
+  return `<button class="item" data-edit="formation" data-id="${f.id}">
+    ${dateBlock(f.debut, "var(--muted)")}
+    <div class="main"><div class="t">${esc(f.intitule)}${exTag(f)}</div><div class="s">${esc(f.lieu)} · ${range}</div></div>
+    <span class="pill ${st[0]}">${st[1]}</span></button>`;
+}
+const listOr = (items, fn, empty) => `<div class="list">${items.length ? items.map(fn).join("") : `<div class="empty">${empty}</div>`}</div>`;
+
+function exampleBanner() {
+  if (!db.example) return "";
+  return `<div class="banner"><span>Données d'exemple affichées. Effacez-les pour commencer avec votre propre carnet.</span>
+    <button class="btn" id="clearEx">Effacer les exemples</button></div>`;
+}
+
+function renderAccueil() {
+  const t = todayIso(), y = new Date().getFullYear(), m = new Date().getMonth();
+  const inMonth = db.vacations.filter(v => { const d = parse(v.date); return d.getFullYear() === y && d.getMonth() === m; });
+  const inYear = db.vacations.filter(v => parse(v.date).getFullYear() === y && v.date <= t);
+  const minYear = inYear.reduce((a, v) => a + duration(v.debut, v.fin, v.pause), 0);
+  const upcoming = [
+    ...db.vacations.filter(v => v.date >= t).map(v => ({ d: v.date, html: vacItem(v) })),
+    ...db.tirs.filter(x => x.date >= t && x.statut !== "fait").map(x => ({ d: x.date, html: tirItem(x) })),
+    ...db.formations.filter(f => (f.fin || f.debut) >= t && f.statut !== "annule").map(f => ({ d: f.debut, html: formItem(f) })),
+  ].sort((a, b) => a.d.localeCompare(b.d)).slice(0, 6);
+  const tirsFaits = db.tirs.filter(x => x.statut === "fait" && parse(x.date).getFullYear() === y).length;
+  const obj = Number(db.settings.tirObjectif) || 0;
+  return `${exampleBanner()}
+  <div class="stats">
+    <div class="stat"><b>${inMonth.length}</b><span>Vacations en ${MOIS[m]}</span></div>
+    <div class="stat"><b>${inYear.length}</b><span>Jours effectués ${y}</span></div>
+    <div class="stat"><b>${fmtH(minYear)}</b><span>Heures effectives ${y}</span></div>
+  </div>
+  ${calendar()}
+  <div class="section-head"><h2>À venir</h2><span class="hint">vacations, tir, formations</span></div>
+  ${upcoming.length ? `<div class="list">${upcoming.map(u => u.html).join("")}</div>` : `<div class="list"><div class="empty">Rien de programmé. Touchez + pour ajouter une vacation.</div></div>`}
+  ${obj ? `<div class="card"><div class="section-head"><h2>Tir ${y}</h2><span class="mono">${tirsFaits} / ${obj}</span></div>
+    <div class="progress"><i style="width:${Math.min(100, tirsFaits/obj*100)}%"></i></div>
+    <span class="hint">Séances effectuées cette année sur l'objectif que vous avez fixé.</span></div>` : ""}`;
+}
+
+function calendar() {
+  const { y, m } = calMonth;
+  const first = new Date(y, m, 1);
+  const start = new Date(first); start.setDate(1 - ((first.getDay() + 6) % 7));
+  const t = todayIso();
+  let cells = "";
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    const s = iso(d);
+    const vs = db.vacations.filter(v => v.date === s);
+    const tirs = db.tirs.some(x => x.date === s);
+    const forms = db.formations.some(f => f.debut <= s && (f.fin || f.debut) >= s && f.statut !== "annule");
+    const dots = [...vs.map(v => svc(v.serviceId)?.color || "var(--muted)"), ...(tirs ? ["var(--crit)"] : []), ...(forms ? ["var(--warn)"] : [])].slice(0, 3);
+    const label = `${d.getDate()} ${MOIS[d.getMonth()]}${vs.length ? ", " + vs.length + " vacation" : ""}${tirs ? ", tir" : ""}${forms ? ", formation" : ""}`;
+    cells += `<button class="day ${d.getMonth() !== m ? "out" : ""} ${s === t ? "today" : ""} ${dots.length ? "has" : ""}" data-day="${s}" aria-label="${label}">
+      ${d.getDate()}<span class="dots">${dots.map(c => `<i style="--c:${c}"></i>`).join("")}</span></button>`;
+  }
+  const legend = db.services.map(s => `<span><i style="--c:${s.color}"></i>${esc(s.nom)}</span>`).join("") +
+    `<span><i style="--c:var(--crit)"></i>Tir</span><span><i style="--c:var(--warn)"></i>Formation</span>`;
+  return `<div class="cal"><div class="cal-head">
+      <button class="btn ghost" data-cal="-1" aria-label="Mois précédent">‹</button>
+      <b>${MOIS[m]} ${y}</b>
+      <button class="btn ghost" data-cal="1" aria-label="Mois suivant">›</button></div>
+    <div class="cal-grid">${["L","M","M","J","V","S","D"].map(d => `<div class="dow">${d}</div>`).join("")}${cells}</div>
+    <div class="legend">${legend}</div></div>`;
+}
+
+function renderVacations() {
+  const sorted = [...db.vacations].sort((a, b) => b.date.localeCompare(a.date));
+  const groups = {};
+  sorted.forEach(v => { const k = v.date.slice(0, 7); (groups[k] ||= []).push(v); });
+  const keys = Object.keys(groups);
+  if (!keys.length) return `${exampleBanner()}<div class="list"><div class="empty">Aucune vacation. Touchez + pour saisir votre première vacation.</div></div>`;
+  return exampleBanner() + keys.map(k => {
+    const [y, m] = k.split("-").map(Number);
+    const tot = groups[k].reduce((a, v) => a + duration(v.debut, v.fin, v.pause), 0);
+    return `<div class="section-head"><h2>${MOIS[m-1]} ${y}</h2><span class="mono">${groups[k].length} j · ${fmtH(tot)}</span></div>
+      <div class="list">${groups[k].map(vacItem).join("")}</div>`;
+  }).join("");
+}
+
+function renderTir() {
+  const y = new Date().getFullYear();
+  const t = todayIso();
+  const prevus = db.tirs.filter(x => x.statut !== "fait").sort((a, b) => a.date.localeCompare(b.date));
+  const faits = db.tirs.filter(x => x.statut === "fait").sort((a, b) => b.date.localeCompare(a.date));
+  const nb = faits.filter(x => parse(x.date).getFullYear() === y).length;
+  const obj = Number(db.settings.tirObjectif) || 0;
+  const last = faits[0];
+  return `${exampleBanner()}
+  <div class="card">
+    <div class="section-head"><h2>Objectif ${y}</h2><span class="mono">${nb} / ${obj || "–"}</span></div>
+    ${obj ? `<div class="progress"><i style="width:${Math.min(100, nb/obj*100)}%"></i></div>` : ""}
+    <div class="hint">${last ? `Dernière séance : ${parse(last.date).getDate()} ${MOIS[parse(last.date).getMonth()]} ${parse(last.date).getFullYear()} (il y a ${-daysUntil(last.date)} jours).` : "Aucune séance enregistrée."}</div>
+    <div class="row2" style="align-items:end"><div class="field"><label for="tirObj">Séances visées par an</label>
+      <input id="tirObj" type="number" min="0" max="12" inputmode="numeric" value="${obj}"></div>
+      <span class="hint">À ajuster selon les consignes de votre unité.</span></div>
+  </div>
+  <div class="section-head"><h2>Programmés</h2></div>
+  ${listOr(prevus, tirItem, "Aucun recyclage programmé.")}
+  <div class="section-head"><h2>Effectués</h2></div>
+  ${listOr(faits, tirItem, "Aucune séance effectuée enregistrée.")}`;
+}
+
+function renderFormations() {
+  const t = todayIso();
+  const a = db.formations.filter(f => (f.fin || f.debut) >= t && f.statut === "prevu").sort((x, y) => x.debut.localeCompare(y.debut));
+  const b = db.formations.filter(f => !a.includes(f)).sort((x, y) => y.debut.localeCompare(x.debut));
+  return `${exampleBanner()}
+  <div class="section-head"><h2>Programmées</h2></div>${listOr(a, formItem, "Aucune formation programmée.")}
+  <div class="section-head"><h2>Historique</h2></div>${listOr(b, formItem, "Aucune formation passée.")}`;
+}
+
+function renderServices() {
+  const items = db.services.map(s => {
+    const vs = db.vacations.filter(v => v.serviceId === s.id);
+    const tot = vs.filter(v => v.date <= todayIso()).reduce((a, v) => a + duration(v.debut, v.fin, v.pause), 0);
+    return `<button class="item" data-edit="service" data-id="${s.id}" style="grid-template-columns: 14px 1fr auto">
+      <span style="width:14px;height:14px;border-radius:50%;background:${s.color}"></span>
+      <div class="main"><div class="t">${esc(s.nom)}${exTag(s)}</div><div class="s">${esc(s.unite || "")}</div></div>
+      <div style="text-align:right"><div class="mono">${vs.length} vac.</div><div class="hint mono">${fmtH(tot)}</div></div></button>`;
+  });
+  return `${exampleBanner()}
+  <div class="section-head"><h2>Affectations</h2><span class="hint">touchez + pour en ajouter</span></div>
+  <div class="list">${items.length ? items.join("") : `<div class="empty">Ajoutez les services où vous êtes affecté (ex. police secours, accueil…).</div>`}</div>
+  <div class="card">
+    <h2>Sauvegarde</h2>
+    <span class="hint">Vos données restent sur cet appareil, dans ce navigateur. Copiez régulièrement la sauvegarde (Notes, mail à vous-même) pour ne rien perdre si les données de Safari sont effacées.</span>
+    <div class="actions"><button class="btn primary" id="exportBtn">Copier la sauvegarde</button><button class="btn" id="importBtn">Restaurer</button></div>
+    <textarea class="backup" id="backupBox" hidden aria-label="Sauvegarde"></textarea>
+    <div class="actions" id="importActions" hidden><button class="btn primary" id="importGo">Restaurer ces données</button></div>
+  </div>`;
+}
+
+function render() {
+  try { localStorage.setItem(KEY+"-tab", tab); } catch (e) {}
+  document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.tab === tab ? "page" : "false"));
+  view.innerHTML = ({ accueil: renderAccueil, vacations: renderVacations, tir: renderTir, formations: renderFormations, services: renderServices })[tab]();
+  const add = document.getElementById("addBtn");
+  add.setAttribute("aria-label", { accueil: "Ajouter une vacation", vacations: "Ajouter une vacation", tir: "Programmer un tir", formations: "Ajouter une formation", services: "Ajouter un service" }[tab]);
+}
+
+/* ---------- Forms ---------- */
+const sheetRoot = document.getElementById("sheetRoot");
+function closeSheet() { sheetRoot.innerHTML = ""; }
+function openSheet(title, body, onSubmit, onDelete) {
+  sheetRoot.innerHTML = `<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+    <div class="grip"></div><form id="f" novalidate><h2>${esc(title)}</h2>${body}
+    <div class="actions">${onDelete ? `<button type="button" class="btn danger" id="del">Supprimer</button>` : ""}
+      <div class="right"><button type="button" class="btn" id="cancel">Annuler</button><button class="btn primary" type="submit">Enregistrer</button></div></div>
+    <div class="confirm" id="confirmDel" hidden>Supprimer définitivement ?<button type="button" class="btn danger" id="delYes">Oui, supprimer</button><button type="button" class="btn" id="delNo">Non</button></div>
+    </form></div></div>`;
+  const f = document.getElementById("f");
+  document.getElementById("scrim").addEventListener("click", e => { if (e.target.id === "scrim") closeSheet(); });
+  document.getElementById("cancel").onclick = closeSheet;
+  if (onDelete) {
+    document.getElementById("del").onclick = () => { document.getElementById("confirmDel").hidden = false; };
+    document.getElementById("delNo").onclick = () => { document.getElementById("confirmDel").hidden = true; };
+    document.getElementById("delYes").onclick = () => { onDelete(); commit("Supprimé"); };
+  }
+  f.addEventListener("submit", e => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(f));
+    const err = onSubmit(data);
+    if (err) { toast(err); return; }
+    commit("Enregistré");
+  });
+  return f;
+}
+function commit(msg) { db.example = db.example && [...db.vacations, ...db.tirs, ...db.formations, ...db.services].some(o => o.example); save(); closeSheet(); render(); toast(msg); }
+function upsert(list, obj) { const i = list.findIndex(o => o.id === obj.id); if (i >= 0) list[i] = obj; else list.push(obj); }
+const opt = (v, cur, label) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(label ?? v)}</option>`;
+
+function vacationForm(v, presetDate) {
+  const isNew = !v;
+  v ||= { id: uid(), date: presetDate || todayIso(), debut: "07:00", fin: "15:00", pause: 30, serviceId: db.services[0]?.id || "", note: "" };
+  const body = `
+    <div class="field"><label for="vDate">Date</label><input id="vDate" name="date" type="date" value="${v.date}" required></div>
+    <div class="row3">
+      <div class="field"><label for="vDeb">Début</label><input id="vDeb" name="debut" type="time" value="${v.debut}"></div>
+      <div class="field"><label for="vFin">Fin</label><input id="vFin" name="fin" type="time" value="${v.fin}"></div>
+      <div class="field"><label for="vPause">Pause (min)</label><input id="vPause" name="pause" type="number" min="0" step="5" inputmode="numeric" value="${v.pause}"></div>
+    </div>
+    <div class="calc"><span class="hint">Durée effective</span><b id="vDur">${fmtH(duration(v.debut, v.fin, v.pause))}</b></div>
+    <div class="field"><label for="vSvc">Service d'affectation</label><select id="vSvc" name="serviceId">
+      ${db.services.map(s => opt(s.id, v.serviceId, s.nom + (s.unite ? " · " + s.unite : ""))).join("")}${opt("", v.serviceId, "— Non renseigné —")}</select></div>
+    <div class="field"><label for="vNote">Note</label><textarea id="vNote" name="note" placeholder="Équipage, mission, indicatif…">${esc(v.note)}</textarea></div>`;
+  const f = openSheet(isNew ? "Nouvelle vacation" : "Modifier la vacation", body, d => {
+    if (!d.date) return "Indiquez la date de la vacation.";
+    upsert(db.vacations, { ...v, ...d, pause: Number(d.pause) || 0, example: false });
+  }, isNew ? null : () => { db.vacations = db.vacations.filter(x => x.id !== v.id); });
+  const upd = () => { document.getElementById("vDur").textContent = fmtH(duration(f.debut.value, f.fin.value, f.pause.value)); };
+  ["debut","fin","pause"].forEach(n => f[n].addEventListener("input", upd));
+}
+
+function tirForm(t) {
+  const isNew = !t;
+  t ||= { id: uid(), date: todayIso(), lieu: "", type: "Séance de tir réglementaire", statut: "prevu", note: "" };
+  const types = ["Séance de tir réglementaire", "Recyclage arme de poing", "Recyclage arme longue", "Tir de qualification", "Autre"];
+  const body = `
+    <div class="row2"><div class="field"><label for="tDate">Date</label><input id="tDate" name="date" type="date" value="${t.date}"></div>
+    <div class="field"><label for="tSt">Statut</label><select id="tSt" name="statut">${opt("prevu", t.statut, "Prévu")}${opt("fait", t.statut, "Effectué")}</select></div></div>
+    <div class="field"><label for="tType">Type</label><select id="tType" name="type">${types.map(x => opt(x, t.type)).join("")}${types.includes(t.type) ? "" : opt(t.type, t.type)}</select></div>
+    <div class="field"><label for="tLieu">Lieu / stand</label><input id="tLieu" name="lieu" value="${esc(t.lieu)}" placeholder="Stand de tir…"></div>
+    <div class="field"><label for="tNote">Note</label><textarea id="tNote" name="note" placeholder="Résultat, moniteur, convocation…">${esc(t.note)}</textarea></div>`;
+  openSheet(isNew ? "Programmer un tir" : "Séance de tir", body, d => {
+    if (!d.date) return "Indiquez la date de la séance.";
+    upsert(db.tirs, { ...t, ...d, example: false });
+  }, isNew ? null : () => { db.tirs = db.tirs.filter(x => x.id !== t.id); });
+}
+
+function formationForm(fo) {
+  const isNew = !fo;
+  fo ||= { id: uid(), debut: todayIso(), fin: todayIso(), intitule: "", lieu: "", statut: "prevu", note: "" };
+  const body = `
+    <div class="field"><label for="fInt">Intitulé</label><input id="fInt" name="intitule" value="${esc(fo.intitule)}" placeholder="Ex. GTPI, secourisme, procédure…"></div>
+    <div class="row2"><div class="field"><label for="fDeb">Du</label><input id="fDeb" name="debut" type="date" value="${fo.debut}"></div>
+    <div class="field"><label for="fFin">Au</label><input id="fFin" name="fin" type="date" value="${fo.fin || fo.debut}"></div></div>
+    <div class="row2"><div class="field"><label for="fLieu">Lieu</label><input id="fLieu" name="lieu" value="${esc(fo.lieu)}"></div>
+    <div class="field"><label for="fSt">Statut</label><select id="fSt" name="statut">${opt("prevu", fo.statut, "Programmée")}${opt("fait", fo.statut, "Suivie")}${opt("annule", fo.statut, "Annulée")}</select></div></div>
+    <div class="field"><label for="fNote">Note</label><textarea id="fNote" name="note">${esc(fo.note)}</textarea></div>`;
+  openSheet(isNew ? "Nouvelle formation" : "Formation", body, d => {
+    if (!d.intitule.trim()) return "Indiquez l'intitulé de la formation.";
+    if (!d.debut) return "Indiquez la date de début.";
+    if (d.fin && d.fin < d.debut) return "La date de fin précède la date de début.";
+    upsert(db.formations, { ...fo, ...d, fin: d.fin || d.debut, example: false });
+  }, isNew ? null : () => { db.formations = db.formations.filter(x => x.id !== fo.id); });
+}
+
+function serviceForm(s) {
+  const isNew = !s;
+  s ||= { id: uid(), nom: "", unite: "", color: COLORS[db.services.length % COLORS.length] };
+  const used = db.vacations.filter(v => v.serviceId === s.id).length;
+  const body = `
+    <div class="field"><label for="sNom">Service</label><input id="sNom" name="nom" value="${esc(s.nom)}" placeholder="Ex. Police secours, BAC, accueil…"></div>
+    <div class="field"><label for="sUn">Unité / commissariat</label><input id="sUn" name="unite" value="${esc(s.unite)}"></div>
+    <div class="field"><label>Couleur dans le calendrier</label><div class="swatches">
+      ${COLORS.map((c, i) => `<label><input type="radio" name="color" value="${c}" ${c === s.color ? "checked" : ""} aria-label="Couleur ${i+1}"><span style="--c:${c}"></span></label>`).join("")}</div></div>
+    ${used && !isNew ? `<span class="hint">${used} vacation(s) liée(s). En cas de suppression, elles resteront sans service.</span>` : ""}`;
+  openSheet(isNew ? "Nouveau service" : "Service", body, d => {
+    if (!d.nom.trim()) return "Indiquez le nom du service.";
+    upsert(db.services, { ...s, ...d, example: false });
+  }, isNew ? null : () => { db.services = db.services.filter(x => x.id !== s.id); db.vacations.forEach(v => { if (v.serviceId === s.id) v.serviceId = ""; }); });
+}
+
+function dayChoice(s) {
+  const d = parse(s);
+  const vs = db.vacations.filter(v => v.date === s);
+  const ts = db.tirs.filter(x => x.date === s);
+  const fs = db.formations.filter(f => f.debut <= s && (f.fin || f.debut) >= s);
+  if (!vs.length && !ts.length && !fs.length) { vacationForm(null, s); return; }
+  sheetRoot.innerHTML = `<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Journée">
+    <div class="grip"></div><div style="display:flex;flex-direction:column;gap:12px">
+    <h2>${JOURS[d.getDay()]} ${d.getDate()} ${MOIS[d.getMonth()]}</h2>
+    <div class="list">${[...vs.map(vacItem), ...ts.map(tirItem), ...fs.map(formItem)].join("")}</div>
+    <div class="actions"><button class="btn" id="cancel">Fermer</button><button class="btn primary" id="addHere">Ajouter une vacation ce jour</button></div></div></div></div>`;
+  document.getElementById("scrim").addEventListener("click", e => { if (e.target.id === "scrim") closeSheet(); });
+  document.getElementById("cancel").onclick = closeSheet;
+  document.getElementById("addHere").onclick = () => vacationForm(null, s);
+  sheetRoot.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => edit(b.dataset.edit, b.dataset.id)));
+}
+
+function edit(kind, id) {
+  if (kind === "vacation") vacationForm(db.vacations.find(x => x.id === id));
+  if (kind === "tir") tirForm(db.tirs.find(x => x.id === id));
+  if (kind === "formation") formationForm(db.formations.find(x => x.id === id));
+  if (kind === "service") serviceForm(db.services.find(x => x.id === id));
+}
+
+let toastTimer;
+function toast(msg) {
+  const r = document.getElementById("toastRoot");
+  r.innerHTML = `<div class="toast" role="status">${esc(msg)}</div>`;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => r.innerHTML = "", 2600);
+}
+
+/* ---------- Events ---------- */
+document.querySelectorAll("nav.tabs button").forEach(b => b.addEventListener("click", () => { tab = b.dataset.tab; render(); window.scrollTo(0, 0); }));
+document.getElementById("addBtn").addEventListener("click", () => {
+  ({ accueil: () => vacationForm(), vacations: () => vacationForm(), tir: () => tirForm(), formations: () => formationForm(), services: () => serviceForm() })[tab]();
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
+
+view.addEventListener("click", e => {
+  const ed = e.target.closest("[data-edit]"); if (ed) { edit(ed.dataset.edit, ed.dataset.id); return; }
+  const day = e.target.closest("[data-day]"); if (day) { dayChoice(day.dataset.day); return; }
+  const cal = e.target.closest("[data-cal]");
+  if (cal) { let m = calMonth.m + Number(cal.dataset.cal), y = calMonth.y; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } calMonth = { y, m }; render(); return; }
+  if (e.target.id === "clearEx") {
+    db.vacations = db.vacations.filter(o => !o.example); db.tirs = db.tirs.filter(o => !o.example);
+    db.formations = db.formations.filter(o => !o.example); db.services = db.services.filter(o => !o.example);
+    db.example = false; save(); render(); toast("Exemples effacés. Commencez par ajouter vos services.");
+  }
+  if (e.target.id === "exportBtn") {
+    const txt = JSON.stringify(db);
+    const box = document.getElementById("backupBox"); box.hidden = false; box.value = txt; document.getElementById("importActions").hidden = true;
+    const done = () => toast("Sauvegarde copiée. Collez-la dans Notes ou un mail.");
+    const fallback = () => { box.focus(); box.select(); toast("Sélectionnez le texte puis copiez-le."); };
+    try { navigator.clipboard.writeText(txt).then(done, fallback); } catch (err) { fallback(); }
+  }
+  if (e.target.id === "importBtn") {
+    const box = document.getElementById("backupBox"); box.hidden = false; box.value = ""; box.placeholder = "Collez ici le texte de sauvegarde"; box.focus();
+    document.getElementById("importActions").hidden = false;
+  }
+  if (e.target.id === "importGo") {
+    try {
+      const d = JSON.parse(document.getElementById("backupBox").value);
+      if (!Array.isArray(d.vacations) || !Array.isArray(d.services)) throw 0;
+      d.tirs ||= []; d.formations ||= []; d.settings ||= { tirObjectif: 3 };
+      db = d; save(); render(); toast("Données restaurées.");
+    } catch (err) { toast("Ce texte n'est pas une sauvegarde valide du carnet."); }
+  }
+});
+view.addEventListener("change", e => {
+  if (e.target.id === "tirObj") { db.settings.tirObjectif = Math.max(0, Number(e.target.value) || 0); save(); render(); }
+});
+
+render();
+})();
+</script>
+
+</body>
+</html>
