@@ -1,7 +1,7 @@
-<title>Carnet de réserve</title>
+<title>Carnet</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Réserve">
+<meta name="apple-mobile-web-app-title" content="Carnet">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0d1a33">
 <link rel="apple-touch-icon" href="icon.png">
@@ -169,25 +169,63 @@ nav.tabs button[aria-current="page"] svg { stroke: var(--accent); }
 .progress { height: 10px; border-radius: 3px; }
 .progress i { display: block; height: 100%; background: repeating-linear-gradient(-55deg, var(--hivis) 0 8px, color-mix(in srgb, var(--hivis) 70%, var(--band)) 8px 12px); }
 textarea.backup { width: 100%; min-height: 120px; font: 12px/1.4 var(--font-mono); border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--bg); }
+/* Lock screen */
+#lock { position: fixed; inset: 0; z-index: 40; overflow-y: auto; color: var(--band-ink);
+  background: radial-gradient(120% 70% at 50% 0%, var(--band-2), var(--band) 70%);
+  padding: calc(env(safe-area-inset-top, 0px) + 28px) max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 20px) max(16px, env(safe-area-inset-left, 0px)); }
+#lock::after { content: ""; position: fixed; left: 0; right: 0; bottom: 0; height: calc(10px + env(safe-area-inset-bottom, 0px)); pointer-events: none;
+  background: repeating-linear-gradient(-55deg, var(--hivis) 0 12px, transparent 12px 16px, color-mix(in srgb, var(--band-ink) 45%, transparent) 16px 18px, transparent 18px 30px); opacity: .85; }
+.lk { max-width: 360px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+.lk .mono-badge { width: 64px; height: 64px; }
+.lk h1 { font: 800 30px/1 var(--font-stencil); letter-spacing: .05em; text-transform: uppercase; margin: 0; }
+.lk p { margin: 0; color: var(--band-muted); font-size: 14px; max-width: 34ch; }
+.lk .prompt { color: var(--band-ink); font-weight: 600; font-size: 16px; min-height: 1.4em; }
+.lk .err { color: var(--hivis); font-size: 13px; min-height: 1.3em; font-weight: 600; }
+.pdots { display: flex; gap: 14px; padding: 6px 0; }
+.pdots i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--band-muted); }
+.pdots i.on { background: var(--hivis); border-color: var(--hivis); }
+.pdots.shake { animation: shake .35s; }
+@keyframes shake { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+.keypad { display: grid; grid-template-columns: repeat(3, 76px); gap: 14px 22px; justify-content: center; margin-top: 4px; }
+.keypad button { width: 76px; height: 76px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--band-ink) 18%, transparent);
+  background: color-mix(in srgb, var(--band-ink) 8%, transparent); color: var(--band-ink); font: 600 30px/1 var(--font-display); display: grid; place-items: center; }
+.keypad button:active { background: color-mix(in srgb, var(--hivis) 35%, transparent); }
+.keypad button.plain { background: transparent; border-color: transparent; font: 600 14px/1.1 var(--font-body); }
+.keypad button svg { width: 30px; height: 30px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.keypad .void { visibility: hidden; }
+.lk .link { background: none; border: 0; color: var(--band-muted); text-decoration: underline; font-size: 14px; padding: 10px; min-height: 44px; }
+.lk .btn { min-width: 200px; }
+.lk .btn.primary { background: var(--hivis); color: var(--hivis-ink); border-color: var(--hivis); }
+.lk .btn.ghostl { background: transparent; color: var(--band-ink); border-color: color-mix(in srgb, var(--band-ink) 30%, transparent); }
+.lk input[type=text] { width: 100%; min-height: 48px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--band-ink) 30%, transparent); background: color-mix(in srgb, var(--band-ink) 8%, transparent); color: var(--band-ink); padding: 10px 12px; font: 500 17px/1.2 var(--font-mono); text-align: center; letter-spacing: .08em; }
+.lk input[type=text]::placeholder { color: var(--band-muted); letter-spacing: .02em; font-family: var(--font-body); }
+.lk label.f { width: 100%; text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--band-muted); display: flex; flex-direction: column; gap: 6px; }
+.lk label.f input { text-align: left; letter-spacing: 0; font-family: var(--font-body); }
+.rcode { font: 600 22px/1.3 var(--font-mono); letter-spacing: .06em; background: color-mix(in srgb, var(--band-ink) 8%, transparent); border: 1px dashed var(--hivis); border-radius: 12px; padding: 14px 16px; user-select: all; -webkit-user-select: all; word-break: break-all; }
+.lk .chk { display: flex; gap: 10px; align-items: center; font-size: 14px; text-align: left; }
+.lk .chk input { width: 22px; height: 22px; accent-color: var(--hivis); flex: none; }
+.lk .steps { font: 500 11px/1 var(--font-mono); letter-spacing: .14em; color: var(--band-muted); text-transform: uppercase; }
+body.privacy main, body.privacy header.top .brand { filter: blur(14px); }
+@media (max-height: 700px) { .keypad { grid-template-columns: repeat(3, 66px); gap: 10px 20px; } .keypad button { width: 66px; height: 66px; } .lk .mono-badge { width: 48px; height: 48px; } }
 @media (max-width: 380px) { .row3 { grid-template-columns: 1fr 1fr; } }
 @media (prefers-reduced-motion: no-preference) { .sheet { animation: up .22s ease-out; } @keyframes up { from { transform: translateY(30px); opacity: .6; } } }
 </style>
 
-<header class="top"><div class="wrap">
+<header class="top" hidden><div class="wrap">
   <div class="id">
     <svg class="mono-badge" viewBox="0 0 48 48" aria-hidden="true">
       <path d="M24 2 43 12v24L24 46 5 36V12z" fill="none" stroke="var(--hivis)" stroke-width="2.5"/>
       <path d="M24 8 38 15.5v17L24 40 10 32.5v-17z" fill="var(--band-2)" stroke="color-mix(in srgb, var(--band-ink) 35%, transparent)" stroke-width="1"/>
       <text x="24" y="29.5" text-anchor="middle" font-family="Big Shoulders Stencil Display, Arial Narrow, sans-serif" font-weight="800" font-size="16" fill="var(--band-ink)" letter-spacing="1">CR</text>
     </svg>
-    <div class="brand">Carnet de réserve<small id="subtitle">Réserve opérationnelle</small></div>
+    <div class="brand"><span id="brandTitle">Carnet</span><small id="subtitle"></small></div>
   </div>
   <button class="add" id="addBtn" aria-label="Ajouter">+</button>
 </div></header>
 
-<main><div class="wrap" id="view"></div></main>
+<main hidden><div class="wrap" id="view"></div></main>
 
-<nav class="tabs" aria-label="Sections"><div class="row">
+<nav class="tabs" aria-label="Sections" hidden><div class="row">
   <button data-tab="accueil"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Accueil</button>
   <button data-tab="vacations"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Vacations</button>
   <button data-tab="tir"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>Tir</button>
@@ -195,12 +233,14 @@ textarea.backup { width: 100%; min-height: 120px; font: 12px/1.4 var(--font-mono
   <button data-tab="services"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg>Services</button>
 </div></nav>
 
+<div id="lock"></div>
 <div id="sheetRoot"></div>
 <div id="toastRoot"></div>
 
 <script>
 (() => {
-const KEY = "carnet-reserve-v1";
+const KEY = "cn";
+const LEGACY_KEY = "carnet-reserve-v1";
 const COLORS = ["#2f5fbf", "#1d8a5a", "#c2410c", "#7c3aed", "#b8860b", "#0e7490", "#be185d", "#4b5563"];
 const MOIS = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
 const MOIS_C = ["janv","févr","mars","avr","mai","juin","juil","août","sept","oct","nov","déc"];
@@ -237,7 +277,7 @@ function vevent(kind, o) {
     const s = svc(o.serviceId);
     const endDate = duration(o.debut, o.fin, 0) + (Number(o.debut.split(":")[0]) * 60 + Number(o.debut.split(":")[1])) >= 1440 ? addDays(o.date, 1) : o.date;
     L.push("DTSTART:" + icsDT(o.date, o.debut), "DTEND:" + icsDT(endDate, o.fin));
-    summary = "Vacation réserve · " + (s?.nom || "service non renseigné");
+    summary = "Vacation · " + (s?.nom || "service non renseigné");
     loc = s?.unite || "";
     desc.push("Durée effective : " + fmtH(duration(o.debut, o.fin, o.pause)) + (o.pause ? ` (pause ${o.pause} min)` : ""));
     alarm = "-PT2H";
@@ -285,44 +325,81 @@ function upcomingEntries() {
 let autoCal = true;
 try { autoCal = localStorage.getItem(KEY + "-autocal") !== "0"; } catch (e) {}
 
-function sample() {
-  const t = todayIso();
-  const s1 = uid(), s2 = uid(), s3 = uid();
-  return {
-    example: true,
-    settings: { tirObjectif: 3 },
-    services: [
-      { id: s1, nom: "Police secours", unite: "CSP (exemple)", color: COLORS[0], example: true },
-      { id: s2, nom: "Accueil du public", unite: "Commissariat (exemple)", color: COLORS[1], example: true },
-      { id: s3, nom: "Sécurisation événement", unite: "DDSP (exemple)", color: COLORS[2], example: true },
-    ],
-    vacations: [
-      { id: uid(), date: addDays(t,-12), debut: "07:00", fin: "15:00", pause: 30, serviceId: s1, note: "", example: true },
-      { id: uid(), date: addDays(t,-5), debut: "13:00", fin: "21:00", pause: 30, serviceId: s2, note: "", example: true },
-      { id: uid(), date: addDays(t,3), debut: "21:00", fin: "05:00", pause: 45, serviceId: s1, note: "Vacation de nuit", example: true },
-      { id: uid(), date: addDays(t,9), debut: "08:00", fin: "18:00", pause: 60, serviceId: s3, note: "", example: true },
-    ],
-    tirs: [
-      { id: uid(), date: addDays(t,-60), lieu: "Stand de tir (exemple)", type: "Séance de tir réglementaire", statut: "fait", note: "", example: true },
-      { id: uid(), date: addDays(t,16), lieu: "Stand de tir (exemple)", type: "Séance de tir réglementaire", statut: "prevu", note: "", example: true },
-    ],
-    formations: [
-      { id: uid(), debut: addDays(t,24), fin: addDays(t,25), intitule: "Gestes techniques professionnels (exemple)", lieu: "Centre de formation", statut: "prevu", note: "", example: true },
-    ],
-  };
+/* ---------- Coffre chiffré (AES-GCM, clé enveloppée par code, code de secours et Face ID) ---------- */
+const VKEY = "cn-vault";
+const ITER = 310000;
+const te = new TextEncoder(), td = new TextDecoder();
+const b64 = buf => { const u = new Uint8Array(buf); let s = ""; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); };
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const rand = n => crypto.getRandomValues(new Uint8Array(n));
+async function pwKey(secret, salt, iter) {
+  const base = await crypto.subtle.importKey("raw", te.encode(secret), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: iter, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
 }
+const rawKey = bytes => crypto.subtle.importKey("raw", bytes, "AES-GCM", false, ["encrypt", "decrypt"]);
+async function seal(key, bytes) { const iv = rand(12); const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, bytes); return { iv: b64(iv), ct: b64(ct) }; }
+async function unseal(key, box) { return new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(box.iv) }, key, unb64(box.ct))); }
+async function wrapSecret(secret, keyBytes) { const salt = rand(16); return { salt: b64(salt), iter: ITER, ...(await seal(await pwKey(secret, salt, ITER), keyBytes)) }; }
+async function unwrapSecret(secret, w) { return unseal(await pwKey(secret, unb64(w.salt), w.iter), w); }
+const RC_ALPHA = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+function newRecoveryCode() { const r = rand(16); let c = ""; for (let i = 0; i < 16; i++) { c += RC_ALPHA[r[i] % RC_ALPHA.length]; if (i % 4 === 3 && i < 15) c += "-"; } return c; }
+const normRC = s => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 
-let db;
-function load() {
-  try { const raw = localStorage.getItem(KEY); if (raw) { db = JSON.parse(raw); } } catch (e) {}
-  if (!db || !db.vacations) db = sample();
-  db.settings ||= { tirObjectif: 3 };
-}
-function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(db)); return true; }
+let vault = null, dataKey = null, db = null;
+function readVault() { try { return JSON.parse(localStorage.getItem(VKEY) || "null"); } catch (e) { return null; } }
+function writeVault() {
+  try { localStorage.setItem(VKEY, JSON.stringify(vault)); return true; }
   catch (e) { toast("Enregistrement impossible sur cet appareil. Faites une sauvegarde."); return false; }
 }
-load();
+function emptyDb() { return { settings: { tirObjectif: 3, titre: "", sousTitre: "" }, services: [], vacations: [], tirs: [], formations: [] }; }
+function normalize(d) {
+  d ||= emptyDb();
+  ["services", "vacations", "tirs", "formations"].forEach(k => { if (!Array.isArray(d[k])) d[k] = []; });
+  d.settings = { tirObjectif: 3, titre: "", sousTitre: "", ...(d.settings || {}) };
+  return d;
+}
+let saving = Promise.resolve();
+function save() {
+  if (!dataKey || !db) return false;
+  const key = dataKey, snapshot = te.encode(JSON.stringify(db));
+  saving = saving.then(async () => { vault.data = await seal(await rawKey(key), snapshot); writeVault(); })
+    .catch(() => toast("Enregistrement impossible. Faites une sauvegarde."));
+  return true;
+}
+async function openData(keyBytes) {
+  db = normalize(JSON.parse(td.decode(await unseal(await rawKey(keyBytes), vault.data))));
+  dataKey = keyBytes;
+}
+
+/* Face ID / Touch ID via passkey + extension PRF (Safari iOS 18+) */
+const bioPossible = () => window.top === window.self && !!window.PublicKeyCredential && !!navigator.credentials && window.isSecureContext;
+async function prfSecret(credId, prfSalt) {
+  const a = await navigator.credentials.get({ publicKey: { challenge: rand(32), allowCredentials: [{ type: "public-key", id: credId }],
+    userVerification: "required", timeout: 60000, extensions: { prf: { eval: { first: prfSalt } } } } });
+  const r = a.getClientExtensionResults().prf?.results?.first;
+  if (!r) throw new Error("noprf");
+  return new Uint8Array(r);
+}
+async function enableBio() {
+  const prfSalt = rand(32);
+  const cred = await navigator.credentials.create({ publicKey: {
+    challenge: rand(32), rp: { name: "Carnet" }, user: { id: rand(16), name: "carnet", displayName: "Carnet" },
+    pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+    authenticatorSelection: { authenticatorAttachment: "platform", residentKey: "preferred", userVerification: "required" },
+    timeout: 60000, extensions: { prf: { eval: { first: prfSalt } } } } });
+  const ext = cred.getClientExtensionResults().prf;
+  if (ext && ext.enabled === false) throw new Error("noprf");
+  const secret = ext?.results?.first ? new Uint8Array(ext.results.first) : await prfSecret(new Uint8Array(cred.rawId), prfSalt);
+  vault.bio = { id: b64(cred.rawId), salt: b64(prfSalt), ...(await seal(await rawKey(secret), dataKey)) };
+  writeVault();
+}
+async function unlockBio() {
+  const secret = await prfSecret(unb64(vault.bio.id), unb64(vault.bio.salt));
+  await openData(await unseal(await rawKey(secret), vault.bio));
+}
+const bioError = e => e && e.message === "noprf"
+  ? "Face ID n'est pas disponible pour cette app sur cet appareil (iOS 18 minimum). Le code reste actif."
+  : "Face ID n'a pas abouti. Utilisez votre code.";
 
 let tab = "accueil";
 try { tab = localStorage.getItem(KEY+"-tab") || "accueil"; } catch (e) {}
@@ -481,7 +558,23 @@ function renderServices() {
   });
   return `${exampleBanner()}
   <div class="section-head"><h2>Affectations</h2><span class="hint">touchez + pour en ajouter</span></div>
-  <div class="list">${items.length ? items.join("") : `<div class="empty">Ajoutez les services où vous êtes affecté (ex. police secours, accueil…).</div>`}</div>
+  <div class="list">${items.length ? items.join("") : `<div class="empty">Ajoutez les services où vous êtes affecté.</div>`}</div>
+  <div class="card">
+    <h2>Personnalisation</h2>
+    <span class="hint">Visible uniquement une fois le carnet déverrouillé. Ces textes sont chiffrés avec vos données.</span>
+    <div class="field"><label for="pTitre">Nom du carnet</label><input id="pTitre" value="${esc(db.settings.titre)}" placeholder="Mon carnet"></div>
+    <div class="field"><label for="pSous">Sous-titre</label><input id="pSous" value="${esc(db.settings.sousTitre)}" placeholder="Facultatif"></div>
+  </div>
+  <div class="card">
+    <h2>Sécurité</h2>
+    <span class="hint">Vos données sont chiffrées sur cet iPhone. Le carnet se verrouille après 1 min en arrière-plan ou 5 min sans action.</span>
+    <div class="actions" style="justify-content:flex-start">
+      <button class="btn primary" id="lockNow">Verrouiller</button>
+      <button class="btn" id="chgPin">Changer le code</button>
+      ${bioPossible() ? (vault.bio ? `<button class="btn" id="bioOff">Désactiver Face ID</button>` : `<button class="btn" id="bioOn">Activer Face ID</button>`) : ""}
+      <button class="btn" id="newRc">Nouveau code de secours</button>
+    </div>
+  </div>
   <div class="card">
     <h2>Agenda iPhone</h2>
     <span class="hint">Chaque vacation, séance de tir ou formation peut être ajoutée à l'app Calendrier (et donc à iCloud), avec un rappel. Si vous renvoyez un événement modifié, choisissez le même calendrier pour qu'il soit mis à jour.</span>
@@ -489,7 +582,7 @@ function renderServices() {
   </div>
   <div class="card">
     <h2>Sauvegarde</h2>
-    <span class="hint">Vos données restent sur cet appareil, dans ce navigateur. Copiez régulièrement la sauvegarde (Notes, mail à vous-même) pour ne rien perdre si les données de Safari sont effacées.</span>
+    <span class="hint">Vos données restent sur cet appareil. Copiez régulièrement la sauvegarde pour ne rien perdre si les données de Safari sont effacées. Elle contient vos données en clair : rangez-la dans une note verrouillée.</span>
     <div class="actions"><button class="btn primary" id="exportBtn">Copier la sauvegarde</button><button class="btn" id="importBtn">Restaurer</button></div>
     <textarea class="backup" id="backupBox" hidden aria-label="Sauvegarde"></textarea>
     <div class="actions" id="importActions" hidden><button class="btn primary" id="importGo">Restaurer ces données</button></div>
@@ -497,6 +590,9 @@ function renderServices() {
 }
 
 function render() {
+  if (!db) return;
+  document.getElementById("brandTitle").textContent = db.settings.titre || "Mon carnet";
+  const sub = document.getElementById("subtitle"); sub.textContent = db.settings.sousTitre || ""; sub.hidden = !db.settings.sousTitre;
   try { localStorage.setItem(KEY+"-tab", tab); } catch (e) {}
   document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.tab === tab ? "page" : "false"));
   view.innerHTML = ({ accueil: renderAccueil, vacations: renderVacations, tir: renderTir, formations: renderFormations, services: renderServices })[tab]();
@@ -564,8 +660,8 @@ function vacationForm(v, presetDate) {
 
 function tirForm(t) {
   const isNew = !t;
-  t ||= { id: uid(), date: todayIso(), lieu: "", type: "Séance de tir réglementaire", statut: "prevu", note: "" };
-  const types = ["Séance de tir réglementaire", "Recyclage arme de poing", "Recyclage arme longue", "Tir de qualification", "Autre"];
+  t ||= { id: uid(), date: todayIso(), lieu: "", type: "Séance de tir", statut: "prevu", note: "" };
+  const types = ["Séance de tir", "Recyclage arme de poing", "Recyclage arme longue", "Tir de qualification", "Autre"];
   const body = `
     <div class="row2"><div class="field"><label for="tDate">Date</label><input id="tDate" name="date" type="date" value="${t.date}"></div>
     <div class="field"><label for="tSt">Statut</label><select id="tSt" name="statut">${opt("prevu", t.statut, "Prévu")}${opt("fait", t.statut, "Effectué")}</select></div></div>
@@ -582,7 +678,7 @@ function formationForm(fo) {
   const isNew = !fo;
   fo ||= { id: uid(), debut: todayIso(), fin: todayIso(), intitule: "", lieu: "", statut: "prevu", note: "" };
   const body = `
-    <div class="field"><label for="fInt">Intitulé</label><input id="fInt" name="intitule" value="${esc(fo.intitule)}" placeholder="Ex. GTPI, secourisme, procédure…"></div>
+    <div class="field"><label for="fInt">Intitulé</label><input id="fInt" name="intitule" value="${esc(fo.intitule)}" placeholder="Ex. secourisme, procédure…"></div>
     <div class="row2"><div class="field"><label for="fDeb">Du</label><input id="fDeb" name="debut" type="date" value="${fo.debut}"></div>
     <div class="field"><label for="fFin">Au</label><input id="fFin" name="fin" type="date" value="${fo.fin || fo.debut}"></div></div>
     <div class="row2"><div class="field"><label for="fLieu">Lieu</label><input id="fLieu" name="lieu" value="${esc(fo.lieu)}"></div>
@@ -601,7 +697,7 @@ function serviceForm(s) {
   s ||= { id: uid(), nom: "", unite: "", color: COLORS[db.services.length % COLORS.length] };
   const used = db.vacations.filter(v => v.serviceId === s.id).length;
   const body = `
-    <div class="field"><label for="sNom">Service</label><input id="sNom" name="nom" value="${esc(s.nom)}" placeholder="Ex. Police secours, BAC, accueil…"></div>
+    <div class="field"><label for="sNom">Service</label><input id="sNom" name="nom" value="${esc(s.nom)}" placeholder="Nom du service"></div>
     <div class="field"><label for="sUn">Unité / commissariat</label><input id="sUn" name="unite" value="${esc(s.unite)}"></div>
     <div class="field"><label>Couleur dans le calendrier</label><div class="swatches">
       ${COLORS.map((c, i) => `<label><input type="radio" name="color" value="${c}" ${c === s.color ? "checked" : ""} aria-label="Couleur ${i+1}"><span style="--c:${c}"></span></label>`).join("")}</div></div>
@@ -656,6 +752,14 @@ view.addEventListener("click", e => {
   const cal = e.target.closest("[data-cal]");
   if (cal) { let m = calMonth.m + Number(cal.dataset.cal), y = calMonth.y; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } calMonth = { y, m }; render(); return; }
   if (e.target.id === "calAll" || e.target.id === "calAll2") { sendToCalendar(upcomingEntries()); return; }
+  if (e.target.id === "lockNow") { lockApp(); return; }
+  if (e.target.id === "chgPin") { flow = { mode: "change1" }; showLock(); return; }
+  if (e.target.id === "newRc") { flow = { mode: "rcnew" }; showLock(); return; }
+  if (e.target.id === "bioOff") { delete vault.bio; writeVault(); render(); toast("Face ID désactivé."); return; }
+  if (e.target.id === "bioOn") {
+    enableBio().then(() => { render(); toast("Face ID activé."); }, err => toast(bioError(err)));
+    return;
+  }
   if (e.target.id === "clearEx") {
     db.vacations = db.vacations.filter(o => !o.example); db.tirs = db.tirs.filter(o => !o.example);
     db.formations = db.formations.filter(o => !o.example); db.services = db.services.filter(o => !o.example);
@@ -676,15 +780,218 @@ view.addEventListener("click", e => {
     try {
       const d = JSON.parse(document.getElementById("backupBox").value);
       if (!Array.isArray(d.vacations) || !Array.isArray(d.services)) throw 0;
-      d.tirs ||= []; d.formations ||= []; d.settings ||= { tirObjectif: 3 };
-      db = d; save(); render(); toast("Données restaurées.");
+      db = normalize(d); save(); render(); toast("Données restaurées.");
     } catch (err) { toast("Ce texte n'est pas une sauvegarde valide du carnet."); }
   }
 });
 view.addEventListener("change", e => {
   if (e.target.id === "tirObj") { db.settings.tirObjectif = Math.max(0, Number(e.target.value) || 0); save(); render(); }
+  if (e.target.id === "pTitre" || e.target.id === "pSous") {
+    db.settings[e.target.id === "pTitre" ? "titre" : "sousTitre"] = e.target.value.trim(); save(); render(); toast("Enregistré");
+  }
 });
 
-render();
+/* ---------- Écran de verrouillage ---------- */
+const lockEl = document.getElementById("lock");
+const appParts = () => [document.querySelector("header.top"), document.querySelector("main"), document.querySelector("nav.tabs")];
+let flow = null, pin = "", busy = false;
+const BADGE = document.querySelector(".mono-badge").outerHTML;
+
+function showApp() { lockEl.hidden = true; lockEl.innerHTML = ""; appParts().forEach(el => el.hidden = false); flow = null; lastAct = Date.now(); render(); }
+function showLock() { closeSheet(); appParts().forEach(el => el.hidden = true); lockEl.hidden = false; pin = ""; drawLock(); }
+function lockApp() { dataKey = null; db = null; view.innerHTML = ""; flow = { mode: "unlock" }; appParts().forEach(el => el.hidden = true); showLock(); }
+
+const ICON_FACE = `<svg viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9v1.5M15 9v1.5M12 9v4h-1M9.5 16c1.5 1 3.5 1 5 0"/></svg>`;
+const ICON_DEL = `<svg viewBox="0 0 24 24"><path d="M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z"/><path d="M17 9l-5 6M12 9l5 6"/></svg>`;
+
+const TEXTS = {
+  set1: ["Étape 1 sur 4", "Choisissez un code à 6 chiffres", "Il protège et chiffre vos données sur cet iPhone."],
+  set2: ["Étape 1 sur 4", "Confirmez votre code", ""],
+  unlock: ["", "Entrez votre code", ""],
+  rec2: ["Code de secours accepté", "Choisissez un nouveau code", "Vos données sont conservées."],
+  rec3: ["", "Confirmez le nouveau code", ""],
+  change1: ["Changer le code", "Nouveau code à 6 chiffres", ""],
+  change2: ["Changer le code", "Confirmez le nouveau code", ""],
+};
+
+function drawLock(err = "") {
+  const m = flow.mode;
+  if (TEXTS[m]) return drawKeypad(err);
+  if (m === "showrc") return drawRecoveryShow();
+  if (m === "perso") return drawPerso();
+  if (m === "bio") return drawBioOffer(err);
+  if (m === "rec1") return drawRecoveryEntry(err);
+  if (m === "rcnew") return drawRcNew();
+}
+function head(steps, title) {
+  return `${steps ? `<div class="steps">${esc(steps)}</div>` : ""}${BADGE}<h1>${esc(title)}</h1>`;
+}
+function drawKeypad(err) {
+  const [steps, prompt, sub] = TEXTS[flow.mode];
+  const canBio = flow.mode === "unlock" && vault?.bio && bioPossible();
+  const fails = vault?.fails || 0, wait = Math.max(0, Math.ceil(((vault?.until || 0) - Date.now()) / 1000));
+  const keys = [1,2,3,4,5,6,7,8,9].map(n => `<button data-k="${n}" aria-label="${n}">${n}</button>`).join("") +
+    (canBio ? `<button class="plain" data-k="bio" aria-label="Face ID">${ICON_FACE}</button>` : (flow.mode.startsWith("change") ? `<button class="plain" data-k="cancel">Annuler</button>` : `<button class="void" tabindex="-1" aria-hidden="true"></button>`)) +
+    `<button data-k="0" aria-label="0">0</button><button class="plain" data-k="del" aria-label="Effacer">${ICON_DEL}</button>`;
+  lockEl.innerHTML = `<div class="lk">${head(steps, "Carnet")}
+    <div class="prompt">${esc(prompt)}</div>${sub ? `<p>${esc(sub)}</p>` : ""}
+    <div class="pdots${err ? " shake" : ""}" aria-label="${pin.length} chiffres saisis sur 6">${[0,1,2,3,4,5].map(i => `<i class="${i < pin.length ? "on" : ""}"></i>`).join("")}</div>
+    <div class="err" role="alert">${esc(wait > 0 && flow.mode === "unlock" ? `Trop d'essais. Réessayez dans ${wait} s.` : err)}</div>
+    <div class="keypad">${keys}</div>
+    ${flow.mode === "unlock" ? `<button class="link" data-k="forgot">Code oublié ?</button>` : ""}
+    ${flow.mode === "unlock" && fails ? `<p>${fails} essai${fails > 1 ? "s" : ""} incorrect${fails > 1 ? "s" : ""}</p>` : ""}
+  </div>`;
+  if (wait > 0 && flow.mode === "unlock") setTimeout(() => { if (flow?.mode === "unlock") drawLock(); }, 1000);
+}
+function drawRecoveryShow() {
+  lockEl.innerHTML = `<div class="lk">${head(flow.setup ? "Étape 2 sur 4" : "Nouveau code de secours", "Code de secours")}
+    <p>Si vous oubliez votre code, ce code de secours permet d'en choisir un nouveau sans perdre vos données. Notez-le en dehors de cette app : note verrouillée, trousseau de mots de passe ou papier.</p>
+    <div class="rcode" id="rcText">${esc(flow.rc)}</div>
+    <button class="btn ghostl" data-k="copyrc">Copier le code</button>
+    <label class="chk"><input type="checkbox" id="rcOk"> J'ai noté mon code de secours</label>
+    <button class="btn primary" data-k="rcdone" id="rcDone" disabled>Continuer</button>
+    <p>Il ne sera plus affiché. Sans lui ni votre code, les données ne peuvent pas être récupérées.</p>
+  </div>`;
+  document.getElementById("rcOk").addEventListener("change", e => { document.getElementById("rcDone").disabled = !e.target.checked; });
+}
+function drawPerso() {
+  lockEl.innerHTML = `<div class="lk">${head("Étape 3 sur 4", "Votre carnet")}
+    <p>Ces textes s'affichent uniquement une fois le carnet déverrouillé. Ils sont chiffrés, rien n'apparaît en clair.</p>
+    <label class="f">Nom du carnet<input type="text" id="sTitre" placeholder="Mon carnet" value="${esc(db.settings.titre)}"></label>
+    <label class="f">Sous-titre<input type="text" id="sSous" placeholder="Facultatif" value="${esc(db.settings.sousTitre)}"></label>
+    <button class="btn primary" data-k="persodone">Continuer</button>
+  </div>`;
+}
+function drawBioOffer(err) {
+  lockEl.innerHTML = `<div class="lk">${head("Étape 4 sur 4", "Face ID")}
+    <p>Déverrouillez le carnet d'un regard. Le code reste disponible en secours. Une clé d'accès nommée « Carnet » sera enregistrée dans votre trousseau iCloud.</p>
+    <div class="err" role="alert">${esc(err)}</div>
+    <button class="btn primary" data-k="bioyes">Activer Face ID</button>
+    <button class="btn ghostl" data-k="biono">Plus tard</button>
+  </div>`;
+}
+function drawRecoveryEntry(err) {
+  lockEl.innerHTML = `<div class="lk">${head("", "Code oublié")}
+    <p>Saisissez votre code de secours (16 caractères). Vous pourrez ensuite choisir un nouveau code, vos données sont conservées.</p>
+    <input type="text" id="rcIn" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" aria-label="Code de secours">
+    <div class="err" role="alert">${esc(err)}</div>
+    <button class="btn primary" data-k="rcgo">Valider</button>
+    <button class="link" data-k="back">Retour au code</button>
+  </div>`;
+  document.getElementById("rcIn").focus();
+}
+function drawRcNew() {
+  lockEl.innerHTML = `<div class="lk">${head("", "Nouveau code de secours")}
+    <p>L'ancien code de secours ne fonctionnera plus.</p>
+    <button class="btn primary" data-k="rcgen">Générer un nouveau code</button>
+    <button class="btn ghostl" data-k="cancel">Annuler</button>
+  </div>`;
+}
+
+async function onPinComplete() {
+  const m = flow.mode, code = pin;
+  busy = true;
+  try {
+    if (m === "set1" || m === "rec2" || m === "change1") { flow = { ...flow, first: code, mode: { set1: "set2", rec2: "rec3", change1: "change2" }[m] }; pin = ""; drawLock(); return; }
+    if (m === "set2" || m === "rec3" || m === "change2") {
+      if (code !== flow.first) { flow.mode = { set2: "set1", rec3: "rec2", change2: "change1" }[m]; pin = ""; drawLock("Les codes ne correspondent pas. Recommencez."); return; }
+      if (m === "set2") {
+        const keyBytes = rand(32), rc = newRecoveryCode();
+        let legacy = null; try { legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || "null"); } catch (e) {}
+        db = normalize(legacy); dataKey = keyBytes;
+        vault = { v: 2, pin: await wrapSecret(code, keyBytes), rec: await wrapSecret(normRC(rc), keyBytes), fails: 0, until: 0 };
+        vault.data = await seal(await rawKey(keyBytes), te.encode(JSON.stringify(db)));
+        if (writeVault()) { try { localStorage.removeItem(LEGACY_KEY); } catch (e) {} }
+        flow = { mode: "showrc", rc, setup: true }; drawLock(); return;
+      }
+      vault.pin = await wrapSecret(code, dataKey); vault.fails = 0; vault.until = 0; writeVault();
+      if (m === "rec3") { showApp(); toast("Nouveau code enregistré."); }
+      else { showApp(); toast("Code modifié."); }
+      return;
+    }
+    if (m === "unlock") {
+      if ((vault.until || 0) > Date.now()) { pin = ""; drawLock(); return; }
+      try { await openData(await unwrapSecret(code, vault.pin)); vault.fails = 0; vault.until = 0; writeVault(); showApp(); }
+      catch (e) {
+        vault.fails = (vault.fails || 0) + 1;
+        if (vault.fails >= 5) vault.until = Date.now() + 30000 * Math.pow(2, Math.min(vault.fails - 5, 5));
+        writeVault(); pin = ""; drawLock("Code incorrect.");
+      }
+    }
+  } finally { busy = false; }
+}
+
+lockEl.addEventListener("click", async e => {
+  const b = e.target.closest("[data-k]"); if (!b || busy) return;
+  const k = b.dataset.k;
+  if (/^\d$/.test(k)) { if (pin.length < 6) { pin += k; drawLock(); if (pin.length === 6) { lockEl.querySelector(".prompt").textContent = "Vérification…"; setTimeout(onPinComplete, 30); } } return; }
+  if (k === "del") { pin = pin.slice(0, -1); drawLock(); return; }
+  if (k === "cancel") { showApp(); return; }
+  if (k === "forgot") { flow = { mode: "rec1" }; drawLock(); return; }
+  if (k === "back") { flow = { mode: "unlock" }; pin = ""; drawLock(); return; }
+  if (k === "bio") {
+    busy = true;
+    try { await unlockBio(); showApp(); } catch (err) { pin = ""; drawLock(bioError(err)); } finally { busy = false; }
+    return;
+  }
+  if (k === "copyrc") {
+    try { await navigator.clipboard.writeText(flow.rc); b.textContent = "Code copié"; }
+    catch (err) { const r = document.createRange(); r.selectNodeContents(document.getElementById("rcText")); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "Sélectionné : copiez-le"; }
+    return;
+  }
+  if (k === "rcdone") { if (flow.setup) { flow = { mode: "perso" }; drawLock(); } else { showApp(); toast("Nouveau code de secours actif."); } return; }
+  if (k === "persodone") {
+    db.settings.titre = document.getElementById("sTitre").value.trim(); db.settings.sousTitre = document.getElementById("sSous").value.trim(); save();
+    if (bioPossible()) { flow = { mode: "bio" }; drawLock(); } else showApp();
+    return;
+  }
+  if (k === "bioyes") {
+    busy = true;
+    try { await enableBio(); showApp(); toast("Face ID activé."); } catch (err) { drawLock(bioError(err)); } finally { busy = false; }
+    return;
+  }
+  if (k === "biono") { showApp(); return; }
+  if (k === "rcgen") {
+    busy = true;
+    try { const rc = newRecoveryCode(); vault.rec = await wrapSecret(normRC(rc), dataKey); writeVault(); flow = { mode: "showrc", rc }; drawLock(); } finally { busy = false; }
+    return;
+  }
+  if (k === "rcgo") {
+    const val = normRC(document.getElementById("rcIn").value);
+    if (val.length !== 16) { drawLock("Le code de secours compte 16 caractères."); return; }
+    busy = true; b.textContent = "Vérification…";
+    try { await openData(await unwrapSecret(val, vault.rec)); flow = { mode: "rec2" }; pin = ""; drawLock(); }
+    catch (err) { drawLock("Code de secours incorrect."); }
+    finally { busy = false; }
+  }
+});
+document.addEventListener("keydown", e => {
+  if (lockEl.hidden || !flow || !TEXTS[flow.mode]) return;
+  if (/^\d$/.test(e.key)) lockEl.querySelector(`[data-k="${e.key}"]`)?.click();
+  if (e.key === "Backspace") lockEl.querySelector(`[data-k="del"]`)?.click();
+});
+
+/* Verrouillage automatique */
+let lastAct = Date.now(), hiddenAt = 0;
+["pointerdown", "keydown", "touchstart"].forEach(ev => document.addEventListener(ev, () => { lastAct = Date.now(); }, { passive: true }));
+setInterval(() => { if (dataKey && lockEl.hidden && Date.now() - lastAct > 5 * 60000) lockApp(); }, 15000);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { hiddenAt = Date.now(); document.body.classList.add("privacy"); }
+  else {
+    document.body.classList.remove("privacy");
+    if (dataKey && Date.now() - hiddenAt > 60000) lockApp();
+  }
+});
+
+function boot() {
+  if (!window.crypto?.subtle) {
+    lockEl.innerHTML = `<div class="lk">${BADGE}<h1>Carnet</h1><p>Ouvrez cette page dans Safari, à son adresse https, pour utiliser le carnet.</p></div>`;
+    return;
+  }
+  vault = readVault();
+  flow = vault ? { mode: "unlock" } : { mode: "set1" };
+  showLock();
+}
+boot();
 })();
 </script>
