@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Carnet</title>
+<style>
+:root { --bg: #0d1a33; --ink: #f2f5fa; --muted: #9fb0cf; --hivis: #e6c32e; color-scheme: dark; }
+body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink); font: 16px/1.45 -apple-system, system-ui, sans-serif;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 24px) max(20px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 24px) max(20px, env(safe-area-inset-left, 0px)); box-sizing: border-box; }
+main { max-width: 340px; display: flex; flex-direction: column; gap: 16px; align-items: center; }
+h1 { margin: 0; font-size: 22px; }
+p { margin: 0; color: var(--muted); }
+a.btn { display: block; width: 100%; box-sizing: border-box; padding: 14px; border-radius: 12px; background: var(--hivis); color: var(--bg); font-weight: 700; text-decoration: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="t">Ajout à l'agenda</h1>
+  <p id="m">Touchez le bouton ci-dessous, puis « Ajouter tout » dans la fenêtre Calendrier.</p>
+  <a class="btn" id="go" href="#">Ajouter à Calendrier</a>
+  <p>Ensuite, revenez au carnet depuis l'écran d'accueil. Vous pouvez fermer cet onglet.</p>
+</main>
+<script>
+(function () {
+  var h = location.hash.slice(1);
+  // On retire aussitôt les données de l'adresse pour qu'elles ne restent pas dans l'historique.
+  try { history.replaceState(null, "", location.pathname); } catch (e) {}
+  var go = document.getElementById("go");
+  if (!h) {
+    document.getElementById("t").textContent = "Rien à ajouter";
+    document.getElementById("m").textContent = "Relancez l'ajout depuis le carnet.";
+    go.hidden = true; go.style.display = "none"; return;
+  }
+  var bin = atob(h.replace(/-/g, "+").replace(/_/g, "/"));
+  var bytes = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  var ics = new TextDecoder().decode(bytes);
+  go.href = "data:text/calendar;charset=utf-8," + encodeURIComponent(ics);
+})();
+</script>
+</body>
+</html>

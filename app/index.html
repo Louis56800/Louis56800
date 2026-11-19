@@ -273,7 +273,7 @@ function duration(debut, fin, pause) {
 }
 
 /* ---------- Agenda (.ics) ---------- */
-const icsEsc = s => String(s ?? "").replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\;");
+const icsEsc = s => String(s ?? "").replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
 const icsDate = s => s.replace(/-/g, "");
 const icsDT = (s, hm) => icsDate(s) + "T" + hm.replace(":", "") + "00";
 function fold(line) { const out = []; while (line.length > 72) { out.push(line.slice(0, 72)); line = " " + line.slice(72); } out.push(line); return out.join("\r\n"); }
@@ -305,14 +305,41 @@ function vevent(kind, o) {
   L.push("BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(summary), "TRIGGER:" + alarm, "END:VALARM", "END:VEVENT");
   return L.map(fold).join("\r\n");
 }
+function buildIcs(entries) {
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Carnet//FR", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+    ...entries.map(([k, o]) => vevent(k, o)), "END:VCALENDAR"].join("\r\n");
+}
+const utf8b64 = str => b64(te.encode(str)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const isHomeScreenApp = () => window.navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
 function sendToCalendar(entries) {
   if (!entries.length) { toast("Aucun événement à envoyer."); return; }
   if (window.top !== window.self) { calendarHelp(); return; }
-  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Carnet de reserve//FR", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
-    ...entries.map(([k, o]) => vevent(k, o)), "END:VCALENDAR"].join("\r\n");
-  const a = document.createElement("a");
-  a.href = "data:text/calendar;charset=utf-8," + encodeURIComponent(ics);
-  document.body.appendChild(a); a.click(); a.remove();
+  const ics = buildIcs(entries);
+  if (!isHomeScreenApp()) {
+    const a = document.createElement("a");
+    a.href = "data:text/calendar;charset=utf-8," + encodeURIComponent(ics);
+    document.body.appendChild(a); a.click(); a.remove();
+    return;
+  }
+  // Depuis l'écran d'accueil, iOS ignore les fichiers : on passe par Safari ou par le menu Partager.
+  const href = new URL("agenda.html", location.href).href + "#" + utf8b64(ics);
+  const file = (() => { try { return new File([ics], "agenda.ics", { type: "text/calendar" }); } catch (e) { return null; } })();
+  const canShare = !!(file && navigator.canShare && navigator.canShare({ files: [file] }));
+  const n = entries.length;
+  sheetRoot.innerHTML = `<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Ajouter à l'agenda">
+    <div class="grip"></div><div style="display:flex;flex-direction:column;gap:12px">
+    <h2>Ajouter à l'agenda</h2>
+    <p style="margin:0">${n} événement${n > 1 ? "s" : ""} prêt${n > 1 ? "s" : ""}. Safari va s'ouvrir : touchez « Ajouter tout » (ou « Ajouter au calendrier »), puis revenez au carnet.</p>
+    <a class="btn primary" id="calOpen" href="${esc(href)}" target="_blank" rel="noopener" style="text-align:center;text-decoration:none;display:grid;place-items:center">Ouvrir dans Safari</a>
+    ${canShare ? `<button class="btn" id="calShare">Autre méthode : partager le fichier</button>
+    <span class="hint">Avec « Partager », choisissez Calendrier si l'option apparaît, sinon « Enregistrer dans Fichiers », puis ouvrez le fichier dans l'app Fichiers.</span>` : ""}
+    <div class="actions"><div class="right"><button class="btn" id="cancel">Fermer</button></div></div></div></div></div>`;
+  document.getElementById("scrim").addEventListener("click", e => { if (e.target.id === "scrim") closeSheet(); });
+  document.getElementById("cancel").onclick = closeSheet;
+  document.getElementById("calOpen").addEventListener("click", () => setTimeout(closeSheet, 300));
+  if (canShare) document.getElementById("calShare").onclick = () => {
+    navigator.share({ files: [file] }).then(closeSheet, err => { if (err?.name !== "AbortError") toast("Le partage n'a pas abouti."); });
+  };
 }
 function calendarHelp() {
   sheetRoot.innerHTML = `<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Agenda iPhone">
