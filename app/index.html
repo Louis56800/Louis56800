@@ -504,7 +504,7 @@ function formationDays(f) {
 }
 const formationMinPerDay = f => Math.round((f.heuresJour === undefined || f.heuresJour === "" ? 7 : Number(f.heuresJour) || 0) * 60);
 function serviceUnits() {
-  const u = db.vacations.map(v => ({ date: v.date, min: duration(v.debut, v.fin, v.pause), kind: "vacation" }));
+  const u = db.vacations.map(v => ({ id: v.id, date: v.date, min: duration(v.debut, v.fin, v.pause), kind: "vacation" }));
   db.formations.forEach(f => { const m = formationMinPerDay(f); formationDays(f).forEach(d => u.push({ date: d, min: m, kind: "formation" })); });
   return u;
 }
@@ -518,32 +518,37 @@ function contractPeriod(ref = todayIso()) {
   if (ref < anniv(y)) y--;
   return { start: anniv(y), end: addDays(anniv(y + 1), -1) };
 }
+// Plafond en jours : une date compte une fois, qu'il y ait une vacation, une formation ou les deux.
+const capDays = () => Math.max(0, Math.round(Number(db.settings.plafond) || 0));
 function contractStats() {
   const per = contractPeriod();
   if (!per) return null;
-  const t = todayIso(), cap = Math.round((Number(db.settings.plafond) || 0) * 60);
-  let done = 0, plan = 0, form = 0;
+  const t = todayIso(), done = new Set(), plan = new Set(), form = new Set();
+  let minutes = 0;
   serviceUnits().forEach(x => {
     if (x.date < per.start || x.date > per.end) return;
-    if (x.date <= t) done += x.min; else plan += x.min;
-    if (x.kind === "formation") form += x.min;
+    (x.date <= t ? done : plan).add(x.date);
+    if (x.kind === "formation") form.add(x.date);
+    if (x.date <= t) minutes += x.min;
   });
-  return { ...per, cap, done, plan, form, left: cap - done - plan };
+  const cap = capDays();
+  return { ...per, cap, done: done.size, plan: plan.size, form: form.size, minutes, left: cap - done.size - plan.size };
 }
+const fmtJ = n => `${n} j`;
 const fmtD = s => { const d = parse(s); return `${d.getDate()} ${MOIS_C[d.getMonth()]} ${d.getFullYear()}`; };
 function contractCard() {
   const c = contractStats();
   if (!c) return `<div class="card"><h2>Plafond annuel</h2>
-    <span class="hint">Renseignez la date de début de votre contrat pour suivre vos heures sur chaque année de contrat.</span>
+    <span class="hint">Renseignez la date de début de votre contrat pour suivre vos jours sur chaque année de contrat.</span>
     <div class="row2"><div class="field"><label for="cDeb">Début du contrat</label><input id="cDeb" type="date"></div>
-    <div class="field"><label for="cCap">Plafond (heures)</label><input id="cCap" type="number" min="0" step="1" inputmode="numeric" value="${esc(db.settings.plafond)}"></div></div></div>`;
+    <div class="field"><label for="cCap">Plafond (jours)</label><input id="cCap" type="number" min="0" step="1" inputmode="numeric" value="${esc(db.settings.plafond)}"></div></div></div>`;
   const pct = x => c.cap ? Math.max(0, Math.min(100, x / c.cap * 100)) : 0;
   const over = c.left < 0;
   return `<div class="card">
-    <div class="section-head"><h2>Plafond ${parse(c.start).getFullYear()}–${parse(c.end).getFullYear()}</h2><span class="mono">${fmtH(c.done)} / ${fmtH(c.cap)}</span></div>
+    <div class="section-head"><h2>Plafond ${parse(c.start).getFullYear()}–${parse(c.end).getFullYear()}</h2><span class="mono">${fmtJ(c.done)} / ${fmtJ(c.cap)}</span></div>
     <div class="progress"><i style="width:${pct(c.done)}%"></i><i class="plan" style="width:${pct(c.plan)}%"></i>${over ? `<i class="over" style="width:4%"></i>` : ""}</div>
-    <div class="hint">Du ${fmtD(c.start)} au ${fmtD(c.end)} · effectuées ${fmtH(c.done)} · programmées ${fmtH(c.plan)}${c.form ? ` · dont formation ${fmtH(c.form)}` : ""}</div>
-    <span class="pill ${over ? "crit" : c.left < 7 * 60 ? "warn" : "ok"}" style="align-self:flex-start">${over ? `Dépassement de ${fmtH(-c.left)}` : `Reste ${fmtH(c.left)} à programmer`}</span>
+    <div class="hint">Du ${fmtD(c.start)} au ${fmtD(c.end)} · effectués ${fmtJ(c.done)} · programmés ${fmtJ(c.plan)}${c.form ? ` · dont formation ${fmtJ(c.form)}` : ""} · ${fmtH(c.minutes)} effectuées</div>
+    <span class="pill ${over ? "crit" : c.left < 5 ? "warn" : "ok"}" style="align-self:flex-start">${over ? `Dépassement de ${fmtJ(-c.left)}` : `Reste ${c.left} jour${c.left > 1 ? "s" : ""} à programmer`}</span>
   </div>`;
 }
 
@@ -567,7 +572,7 @@ function renderAccueil() {
   <div class="stats">
     <div class="stat"><b>${daysMonth}</b><span>Jours de service en ${MOIS[m]}</span></div>
     <div class="stat"><b>${doneDays}</b><span>Jours effectués ${cs ? "ce contrat" : y}</span></div>
-    ${cs ? `<div class="stat"><b>${fmtH(Math.max(0, cs.left))}</b><span>Heures restantes sur ${fmtH(cs.cap)}</span></div>`
+    ${cs ? `<div class="stat"><b>${Math.max(0, cs.left)}</b><span>Jours restants sur ${cs.cap}</span></div>`
          : `<div class="stat"><b>${fmtH(doneMin)}</b><span>Heures effectuées ${y}</span></div>`}
   </div>
   ${contractCard()}
@@ -674,7 +679,7 @@ function renderServices() {
     <h2>Contrat</h2>
     <span class="hint">Le plafond se remet à zéro chaque année à la date anniversaire du contrat. Vacations et formations comptées comme temps de vacation y sont incluses.</span>
     <div class="row2"><div class="field"><label for="cDeb">Début du contrat</label><input id="cDeb" type="date" value="${esc(db.settings.contratDebut || "")}"></div>
-    <div class="field"><label for="cCap">Plafond (heures)</label><input id="cCap" type="number" min="0" step="1" inputmode="numeric" value="${esc(db.settings.plafond)}"></div></div>
+    <div class="field"><label for="cCap">Plafond (jours)</label><input id="cCap" type="number" min="0" step="1" inputmode="numeric" value="${esc(db.settings.plafond)}"></div></div>
   </div>
   <div class="card">
     <h2>Sécurité</h2>
@@ -770,11 +775,12 @@ function vacationForm(v, presetDate) {
     document.getElementById("vDur").textContent = fmtH(dur);
     const per = f.date.value ? contractPeriod(f.date.value) : null, el = document.getElementById("vLeft");
     if (!per) { el.textContent = ""; return; }
-    const cap = Math.round((Number(db.settings.plafond) || 0) * 60);
-    const used = serviceUnits().filter(x => x.date >= per.start && x.date <= per.end).reduce((a, x) => a + x.min, 0)
-      - (isNew || v.date < per.start || v.date > per.end ? 0 : duration(v.debut, v.fin, v.pause));
-    const left = cap - used - dur;
-    el.textContent = left >= 0 ? `Il restera ${fmtH(left)} sur ${fmtH(cap)}` : `Dépasse le plafond de ${fmtH(-left)}`;
+    const cap = capDays();
+    const days = new Set(serviceUnits().filter(x => x.id !== v.id && x.date >= per.start && x.date <= per.end).map(x => x.date));
+    const already = days.has(f.date.value);
+    days.add(f.date.value);
+    const left = cap - days.size;
+    el.textContent = left >= 0 ? `${already ? "Jour déjà compté · il" : "Il"} restera ${left} j sur ${cap}` : `Dépasse le plafond de ${-left} j`;
     document.getElementById("vCalc").classList.toggle("warn", left < 0);
   };
   ["date","debut","fin","pause"].forEach(n => f[n].addEventListener("input", upd)); upd();
