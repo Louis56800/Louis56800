@@ -116,6 +116,8 @@ h2::before { content: ""; width: 4px; height: .85em; background: var(--hivis); t
 .pill.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
 .pill.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent); }
 .pill.crit { color: var(--crit); background: color-mix(in srgb, var(--crit) 14%, transparent); }
+.item.cancelled .t { text-decoration: line-through; color: var(--muted); }
+.item.cancelled .date b { color: var(--muted); }
 .empty { padding: 22px 16px; text-align: center; color: var(--muted); font-size: 14px; }
 .example { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--warn); margin-left: 6px; }
 
@@ -279,6 +281,16 @@ function duration(debut, fin, pause) {
   return Math.max(0, d - (Number(pause)||0));
 }
 
+/* ---------- Statuts : "prevu" passe tout seul en effectué une fois la date passée ; "annule" sort du décompte ---------- */
+const isCancelled = o => o.statut === "annule";
+function vacEnd(v) {
+  const overnight = v.fin && v.debut && v.fin <= v.debut;
+  return new Date(`${overnight ? addDays(v.date, 1) : v.date}T${v.fin || "23:59"}:00`);
+}
+const vacDone = v => !isCancelled(v) && vacEnd(v) <= new Date();
+const tirDone = t => !isCancelled(t) && (t.statut === "fait" || t.date < todayIso());
+const formEnded = f => (f.fin || f.debut) < todayIso();
+
 /* ---------- Agenda (.ics) ---------- */
 const icsEsc = s => String(s ?? "").replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
 const icsDate = s => s.replace(/-/g, "");
@@ -296,10 +308,11 @@ function vevent(kind, o) {
     loc = s?.unite || "";
     desc.push("Durée effective : " + fmtH(duration(o.debut, o.fin, o.pause)) + (o.pause ? ` (pause ${o.pause} min)` : ""));
     alarm = "-PT2H";
+    if (isCancelled(o)) L.push("STATUS:CANCELLED");
   } else if (kind === "tir") {
     L.push("DTSTART;VALUE=DATE:" + icsDate(o.date), "DTEND;VALUE=DATE:" + icsDate(addDays(o.date, 1)));
     summary = "Tir · " + o.type; loc = o.lieu; alarm = "-PT15H";
-    if (o.statut === "fait") desc.push("Séance effectuée");
+    if (isCancelled(o)) L.push("STATUS:CANCELLED");
   } else {
     L.push("DTSTART;VALUE=DATE:" + icsDate(o.debut), "DTEND;VALUE=DATE:" + icsDate(addDays(o.fin || o.debut, 1)));
     summary = "Formation · " + o.intitule; loc = o.lieu; alarm = "-PT15H";
@@ -362,9 +375,9 @@ function calendarHelp() {
 }
 function upcomingEntries() {
   const t = todayIso();
-  return [...db.vacations.filter(v => v.date >= t).map(v => ["vacation", v]),
-    ...db.tirs.filter(x => x.date >= t).map(x => ["tir", x]),
-    ...db.formations.filter(f => (f.fin || f.debut) >= t).map(f => ["formation", f])];
+  return [...db.vacations.filter(v => v.date >= t && !isCancelled(v)).map(v => ["vacation", v]),
+    ...db.tirs.filter(x => x.date >= t && !isCancelled(x)).map(x => ["tir", x]),
+    ...db.formations.filter(f => (f.fin || f.debut) >= t && !isCancelled(f)).map(f => ["formation", f])];
 }
 let autoCal = true;
 try { autoCal = localStorage.getItem(KEY + "-autocal") !== "0"; } catch (e) {}
@@ -460,26 +473,26 @@ function exTag(o) { return o.example ? `<span class="example">exemple</span>` : 
 
 function vacItem(v) {
   const s = svc(v.serviceId);
-  const past = v.date < todayIso();
-  return `<button class="item" data-edit="vacation" data-id="${v.id}">
+  const st = isCancelled(v) ? ["crit", "Annulée"] : vacDone(v) ? ["ok", "Effectuée"] : ["", "Prévue"];
+  return `<button class="item${isCancelled(v) ? " cancelled" : ""}" data-edit="vacation" data-id="${v.id}">
     ${dateBlock(v.date, s?.color)}
     <div class="main"><div class="t">${esc(s?.nom || "Service non renseigné")}${exTag(v)}</div>
     <div class="s"><span class="mono">${v.debut}–${v.fin}</span> · ${JOURS[parse(v.date).getDay()]}${v.note ? " · " + esc(v.note) : ""}</div></div>
-    <div style="text-align:right"><div class="mono" style="font-weight:600">${fmtH(duration(v.debut, v.fin, v.pause))}</div><span class="pill ${past ? "ok" : ""}">${past ? "Effectuée" : "Prévue"}</span></div>
+    <div style="text-align:right"><div class="mono" style="font-weight:600">${fmtH(duration(v.debut, v.fin, v.pause))}</div><span class="pill ${st[0]}">${st[1]}</span></div>
   </button>`;
 }
 function tirItem(t) {
-  const st = t.statut === "fait" ? ["ok","Fait"] : t.date < todayIso() ? ["crit","À valider"] : ["warn","Prévu"];
+  const st = isCancelled(t) ? ["crit","Annulé"] : tirDone(t) ? ["ok","Fait"] : ["warn","Prévu"];
   const dd = daysUntil(t.date);
-  return `<button class="item" data-edit="tir" data-id="${t.id}">
+  return `<button class="item${isCancelled(t) ? " cancelled" : ""}" data-edit="tir" data-id="${t.id}">
     ${dateBlock(t.date, "var(--accent)")}
-    <div class="main"><div class="t">${esc(t.type)}${exTag(t)}</div><div class="s">${esc(t.lieu)}${t.statut !== "fait" && dd >= 0 ? ` · dans ${dd} j` : ""}</div></div>
+    <div class="main"><div class="t">${esc(t.type)}${exTag(t)}</div><div class="s">${esc(t.lieu)}${!tirDone(t) && !isCancelled(t) && dd >= 0 ? ` · dans ${dd} j` : ""}</div></div>
     <span class="pill ${st[0]}">${st[1]}</span></button>`;
 }
 function formItem(f) {
-  const st = f.statut === "fait" ? ["ok","Suivie"] : f.statut === "annule" ? ["crit","Annulée"] : ["warn","Programmée"];
+  const st = isCancelled(f) ? ["crit","Annulée"] : formEnded(f) ? ["ok","Suivie"] : f.debut <= todayIso() ? ["warn","En cours"] : ["warn","Programmée"];
   const range = f.fin && f.fin !== f.debut ? `jusqu'au ${parse(f.fin).getDate()} ${MOIS_C[parse(f.fin).getMonth()]}` : "1 jour";
-  return `<button class="item" data-edit="formation" data-id="${f.id}">
+  return `<button class="item${isCancelled(f) ? " cancelled" : ""}" data-edit="formation" data-id="${f.id}">
     ${dateBlock(f.debut, "var(--muted)")}
     <div class="main"><div class="t">${esc(f.intitule)}${exTag(f)}</div><div class="s">${f.lieu ? esc(f.lieu) + " · " : ""}${range}${(() => { const n = formationDays(f).length; return n ? ` · ${n} j · ${fmtH(n * formationMinPerDay(f))}` : ""; })()}</div></div>
     <span class="pill ${st[0]}">${st[1]}</span></button>`;
@@ -504,8 +517,9 @@ function formationDays(f) {
 }
 const formationMinPerDay = f => Math.round((f.heuresJour === undefined || f.heuresJour === "" ? 7 : Number(f.heuresJour) || 0) * 60);
 function serviceUnits() {
-  const u = db.vacations.map(v => ({ id: v.id, date: v.date, min: duration(v.debut, v.fin, v.pause), kind: "vacation" }));
-  db.formations.forEach(f => { const m = formationMinPerDay(f); formationDays(f).forEach(d => u.push({ date: d, min: m, kind: "formation" })); });
+  const t = todayIso();
+  const u = db.vacations.filter(v => !isCancelled(v)).map(v => ({ id: v.id, date: v.date, min: duration(v.debut, v.fin, v.pause), kind: "vacation", done: vacDone(v) }));
+  db.formations.forEach(f => { const m = formationMinPerDay(f); formationDays(f).forEach(d => u.push({ date: d, min: m, kind: "formation", done: d < t })); });
   return u;
 }
 function contractPeriod(ref = todayIso()) {
@@ -529,7 +543,7 @@ function contractStats() {
   let done = 0, plan = 0, form = 0;
   serviceUnits().forEach(x => {
     if (x.date < per.start || x.date > per.end) return;
-    if (x.date <= t) done += x.min; else plan += x.min;
+    if (x.done) done += x.min; else plan += x.min;
     if (x.kind === "formation") form += x.min;
   });
   const cap = capDays();
@@ -560,15 +574,15 @@ function renderAccueil() {
   const monthKey = `${y}-${pad(m + 1)}`;
   const daysMonth = new Set(units.filter(x => x.date.startsWith(monthKey)).map(x => x.date)).size;
   const cs = contractStats();
-  const doneUnits = units.filter(x => x.date <= t && (cs ? x.date >= cs.start : x.date.startsWith(String(y))));
+  const doneUnits = units.filter(x => x.done && (cs ? x.date >= cs.start : x.date.startsWith(String(y))));
   const doneMin = doneUnits.reduce((a, x) => a + x.min, 0);
   const doneDays = new Set(doneUnits.map(x => x.date)).size;
   const upcoming = [
-    ...db.vacations.filter(v => v.date >= t).map(v => ({ d: v.date, html: vacItem(v) })),
-    ...db.tirs.filter(x => x.date >= t && x.statut !== "fait").map(x => ({ d: x.date, html: tirItem(x) })),
+    ...db.vacations.filter(v => v.date >= t && !isCancelled(v)).map(v => ({ d: v.date, html: vacItem(v) })),
+    ...db.tirs.filter(x => x.date >= t && !tirDone(x) && !isCancelled(x)).map(x => ({ d: x.date, html: tirItem(x) })),
     ...db.formations.filter(f => (f.fin || f.debut) >= t && f.statut !== "annule").map(f => ({ d: f.debut, html: formItem(f) })),
   ].sort((a, b) => a.d.localeCompare(b.d)).slice(0, 6);
-  const tirsFaits = db.tirs.filter(x => x.statut === "fait" && parse(x.date).getFullYear() === y).length;
+  const tirsFaits = db.tirs.filter(x => tirDone(x) && parse(x.date).getFullYear() === y).length;
   const obj = Number(db.settings.tirObjectif) || 0;
   return `${exampleBanner()}
   <div class="stats">
@@ -595,8 +609,8 @@ function calendar() {
   for (let i = 0; i < 42; i++) {
     const d = new Date(start); d.setDate(start.getDate() + i);
     const s = iso(d);
-    const vs = db.vacations.filter(v => v.date === s);
-    const tirs = db.tirs.some(x => x.date === s);
+    const vs = db.vacations.filter(v => v.date === s && !isCancelled(v));
+    const tirs = db.tirs.some(x => x.date === s && !isCancelled(x));
     const forms = db.formations.some(f => f.debut <= s && (f.fin || f.debut) >= s && f.statut !== "annule");
     const dots = [...vs.map(v => svc(v.serviceId)?.color || "var(--muted)"), ...(tirs ? ["var(--crit)"] : []), ...(forms ? ["var(--warn)"] : [])].slice(0, 3);
     const label = `${d.getDate()} ${MOIS[d.getMonth()]}${vs.length ? ", " + vs.length + " vacation" : ""}${tirs ? ", tir" : ""}${forms ? ", formation" : ""}`;
@@ -621,8 +635,9 @@ function renderVacations() {
   if (!keys.length) return `${exampleBanner()}<div class="list"><div class="empty">Aucune vacation. Touchez + pour saisir votre première vacation.</div></div>`;
   return exampleBanner() + keys.map(k => {
     const [y, m] = k.split("-").map(Number);
-    const tot = groups[k].reduce((a, v) => a + duration(v.debut, v.fin, v.pause), 0);
-    return `<div class="section-head"><h2>${MOIS[m-1]} ${y}</h2><span class="mono">${groups[k].length} j · ${fmtH(tot)}</span></div>
+    const act = groups[k].filter(v => !isCancelled(v));
+    const tot = act.reduce((a, v) => a + duration(v.debut, v.fin, v.pause), 0);
+    return `<div class="section-head"><h2>${MOIS[m-1]} ${y}</h2><span class="mono">${act.length} j · ${fmtH(tot)}</span></div>
       <div class="list">${groups[k].map(vacItem).join("")}</div>`;
   }).join("");
 }
@@ -630,11 +645,11 @@ function renderVacations() {
 function renderTir() {
   const y = new Date().getFullYear();
   const t = todayIso();
-  const prevus = db.tirs.filter(x => x.statut !== "fait").sort((a, b) => a.date.localeCompare(b.date));
-  const faits = db.tirs.filter(x => x.statut === "fait").sort((a, b) => b.date.localeCompare(a.date));
-  const nb = faits.filter(x => parse(x.date).getFullYear() === y).length;
+  const prevus = db.tirs.filter(x => !tirDone(x) && !isCancelled(x)).sort((a, b) => a.date.localeCompare(b.date));
+  const faits = db.tirs.filter(x => !prevus.includes(x)).sort((a, b) => b.date.localeCompare(a.date));
+  const nb = faits.filter(x => tirDone(x) && parse(x.date).getFullYear() === y).length;
   const obj = Number(db.settings.tirObjectif) || 0;
-  const last = faits[0];
+  const last = faits.find(tirDone);
   return `${exampleBanner()}
   <div class="card">
     <div class="section-head"><h2>Objectif ${y}</h2><span class="mono">${nb} / ${obj || "–"}</span></div>
@@ -646,13 +661,13 @@ function renderTir() {
   </div>
   <div class="section-head"><h2>Programmés</h2></div>
   ${listOr(prevus, tirItem, "Aucun recyclage programmé.")}
-  <div class="section-head"><h2>Effectués</h2></div>
-  ${listOr(faits, tirItem, "Aucune séance effectuée enregistrée.")}`;
+  <div class="section-head"><h2>Passés</h2></div>
+  ${listOr(faits, tirItem, "Aucune séance passée.")}`;
 }
 
 function renderFormations() {
   const t = todayIso();
-  const a = db.formations.filter(f => (f.fin || f.debut) >= t && f.statut === "prevu").sort((x, y) => x.debut.localeCompare(y.debut));
+  const a = db.formations.filter(f => !formEnded(f) && !isCancelled(f)).sort((x, y) => x.debut.localeCompare(y.debut));
   const b = db.formations.filter(f => !a.includes(f)).sort((x, y) => y.debut.localeCompare(x.debut));
   return `${exampleBanner()}
   <div class="section-head"><h2>Programmées</h2></div>${listOr(a, formItem, "Aucune formation programmée.")}
@@ -661,8 +676,8 @@ function renderFormations() {
 
 function renderServices() {
   const items = db.services.map(s => {
-    const vs = db.vacations.filter(v => v.serviceId === s.id);
-    const tot = vs.filter(v => v.date <= todayIso()).reduce((a, v) => a + duration(v.debut, v.fin, v.pause), 0);
+    const vs = db.vacations.filter(v => v.serviceId === s.id && !isCancelled(v));
+    const tot = vs.filter(vacDone).reduce((a, v) => a + duration(v.debut, v.fin, v.pause), 0);
     return `<button class="item" data-edit="service" data-id="${s.id}" style="grid-template-columns: 14px 1fr auto">
       <span style="width:14px;height:14px;border-radius:50%;background:${s.color}"></span>
       <div class="main"><div class="t">${esc(s.nom)}${exTag(s)}</div><div class="s">${esc(s.unite || "")}</div></div>
@@ -768,10 +783,15 @@ function vacationForm(v, presetDate) {
     <div class="calc" id="vCalc"><span class="hint">Durée effective<span class="sub" id="vLeft"></span></span><b id="vDur">${fmtH(duration(v.debut, v.fin, v.pause))}</b></div>
     <div class="field"><label for="vSvc">Service d'affectation</label><select id="vSvc" name="serviceId">
       ${db.services.map(s => opt(s.id, v.serviceId, s.nom + (s.unite ? " · " + s.unite : ""))).join("")}${opt("", v.serviceId, "— Non renseigné —")}</select></div>
+    <div class="field"><label for="vSt">Statut</label><select id="vSt" name="statut">
+      ${opt("prevu", isCancelled(v) ? "" : "prevu", "Prévue, puis effectuée automatiquement")}${opt("annule", isCancelled(v) ? "annule" : "", "Annulée (non décomptée)")}</select></div>
     <div class="field"><label for="vNote">Note</label><textarea id="vNote" name="note" placeholder="Équipage, mission, indicatif…">${esc(v.note)}</textarea></div>`;
   const f = openSheet(isNew ? "Nouvelle vacation" : "Modifier la vacation", body, d => {
     if (!d.date) return "Indiquez la date de la vacation.";
-    return upsert(db.vacations, { ...v, ...d, pause: Number(d.pause) || 0, example: false });
+    const wasCancelled = isCancelled(v);
+    const saved = upsert(db.vacations, { ...v, ...d, pause: Number(d.pause) || 0, example: false });
+    if (isCancelled(saved) && !wasCancelled) setTimeout(() => toast("Vacation annulée. Pensez à la supprimer de votre agenda."), 2700);
+    return saved;
   }, isNew ? null : () => { db.vacations = db.vacations.filter(x => x.id !== v.id); }, "vacation", isNew ? null : v);
   const upd = () => {
     const dur = duration(f.debut.value, f.fin.value, f.pause.value);
@@ -780,11 +800,12 @@ function vacationForm(v, presetDate) {
     if (!per) { el.textContent = ""; return; }
     const cap = capDays();
     const used = serviceUnits().filter(x => x.id !== v.id && x.date >= per.start && x.date <= per.end).reduce((a, x) => a + x.min, 0);
-    const left = cap - toDays(used + dur);
+    const left = cap - toDays(used + (f.statut.value === "annule" ? 0 : dur));
+    if (f.statut.value === "annule") { el.textContent = `Annulée : non décomptée · il restera ${fmtJ(Math.max(0, left))} sur ${numFr(cap)}`; document.getElementById("vCalc").classList.remove("warn"); return; }
     el.textContent = `Compte pour ${fmtJ(toDays(dur))} · ` + (left >= -0.05 ? `il restera ${fmtJ(Math.max(0, left))} sur ${numFr(cap)}` : `dépasse le plafond de ${fmtJ(-left)}`);
     document.getElementById("vCalc").classList.toggle("warn", left < -0.05);
   };
-  ["date","debut","fin","pause"].forEach(n => f[n].addEventListener("input", upd)); upd();
+  ["date","debut","fin","pause"].forEach(n => f[n].addEventListener("input", upd)); f.statut.addEventListener("change", upd); upd();
 }
 
 function tirForm(t) {
@@ -793,7 +814,7 @@ function tirForm(t) {
   const types = ["Séance de tir", "Recyclage arme de poing", "Recyclage arme longue", "Tir de qualification", "Autre"];
   const body = `
     <div class="row2"><div class="field"><label for="tDate">Date</label><input id="tDate" name="date" type="date" value="${t.date}"></div>
-    <div class="field"><label for="tSt">Statut</label><select id="tSt" name="statut">${opt("prevu", t.statut, "Prévu")}${opt("fait", t.statut, "Effectué")}</select></div></div>
+    <div class="field"><label for="tSt">Statut</label><select id="tSt" name="statut">${opt("prevu", isCancelled(t) ? "" : "prevu", "Prévu, puis fait automatiquement")}${opt("annule", isCancelled(t) ? "annule" : "", "Annulé")}</select></div></div>
     <div class="field"><label for="tType">Type</label><select id="tType" name="type">${types.map(x => opt(x, t.type)).join("")}${types.includes(t.type) ? "" : opt(t.type, t.type)}</select></div>
     <div class="field"><label for="tLieu">Lieu / stand</label><input id="tLieu" name="lieu" value="${esc(t.lieu)}" placeholder="Stand de tir…"></div>
     <div class="field"><label for="tNote">Note</label><textarea id="tNote" name="note" placeholder="Résultat, moniteur, convocation…">${esc(t.note)}</textarea></div>`;
@@ -811,7 +832,7 @@ function formationForm(fo) {
     <div class="row2"><div class="field"><label for="fDeb">Du</label><input id="fDeb" name="debut" type="date" value="${fo.debut}"></div>
     <div class="field"><label for="fFin">Au</label><input id="fFin" name="fin" type="date" value="${fo.fin || fo.debut}"></div></div>
     <div class="row2"><div class="field"><label for="fLieu">Lieu</label><input id="fLieu" name="lieu" value="${esc(fo.lieu)}"></div>
-    <div class="field"><label for="fSt">Statut</label><select id="fSt" name="statut">${opt("prevu", fo.statut, "Programmée")}${opt("fait", fo.statut, "Suivie")}${opt("annule", fo.statut, "Annulée")}</select></div></div>
+    <div class="field"><label for="fSt">Statut</label><select id="fSt" name="statut">${opt("prevu", isCancelled(fo) ? "" : "prevu", "Programmée, puis suivie automatiquement")}${opt("annule", isCancelled(fo) ? "annule" : "", "Annulée (non décomptée)")}</select></div></div>
     <label class="check"><input type="checkbox" id="fCompte" name="compte" ${fo.compte === false ? "" : "checked"}> Compte comme temps de vacation</label>
     <div class="row2"><div class="field"><label for="fH">Heures par jour</label><input id="fH" name="heuresJour" type="number" min="0" max="24" step="0.5" inputmode="decimal" value="${fo.heuresJour ?? 7}"></div>
     <label class="check" style="align-self:end"><input type="checkbox" id="fWe" name="weekend" ${fo.weekend ? "checked" : ""}> Compter samedi et dimanche</label></div>
