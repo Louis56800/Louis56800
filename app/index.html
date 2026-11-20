@@ -130,6 +130,8 @@ h2::before { content: ""; width: 4px; height: .85em; background: var(--hivis); t
 .day.out { color: var(--muted); opacity: .4; }
 .day.today { background: var(--band); color: var(--band-ink); font-weight: 700; box-shadow: inset 0 -3px 0 var(--hivis); }
 .day.has { background: var(--accent-soft); }
+.day.today, .day.today.has { background: var(--band); color: var(--band-ink); }
+.day.today .dots i { box-shadow: 0 0 0 1.5px var(--band); }
 .dots { display: flex; gap: 3px; height: 6px; }
 .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 12px; color: var(--muted); }
@@ -158,6 +160,8 @@ nav.tabs button[aria-current="page"] svg { stroke: var(--accent); }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 .calc { background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; }
+.calc.warn { background: color-mix(in srgb, var(--crit) 14%, transparent); }
+.calc .sub { display: block; font-size: 12px; color: var(--muted); }
 .calc b { font: 800 26px/1 var(--font-display); font-variant-numeric: tabular-nums; }
 .actions { display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap; margin-top: 4px; }
 .actions .right { display: flex; gap: 8px; margin-left: auto; }
@@ -175,6 +179,9 @@ nav.tabs button[aria-current="page"] svg { stroke: var(--accent); }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .progress { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
 .progress { height: 10px; border-radius: 3px; }
+.progress { display: flex; }
+.progress i.plan { background: repeating-linear-gradient(-55deg, color-mix(in srgb, var(--accent) 55%, transparent) 0 6px, transparent 6px 10px); }
+.progress i.over { background: var(--crit); }
 .progress i { display: block; height: 100%; background: repeating-linear-gradient(-55deg, var(--hivis) 0 8px, color-mix(in srgb, var(--hivis) 70%, var(--band)) 8px 12px); }
 textarea.backup { width: 100%; min-height: 120px; font: 12px/1.4 var(--font-mono); border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--bg); }
 /* Lock screen */
@@ -392,7 +399,7 @@ function emptyDb() { return { settings: { tirObjectif: 3, titre: "", sousTitre: 
 function normalize(d) {
   d ||= emptyDb();
   ["services", "vacations", "tirs", "formations"].forEach(k => { if (!Array.isArray(d[k])) d[k] = []; });
-  d.settings = { tirObjectif: 3, titre: "", sousTitre: "", ...(d.settings || {}) };
+  d.settings = { tirObjectif: 3, titre: "", sousTitre: "", contratDebut: "", plafond: 90, ...(d.settings || {}) };
   return d;
 }
 let saving = Promise.resolve();
@@ -474,7 +481,7 @@ function formItem(f) {
   const range = f.fin && f.fin !== f.debut ? `jusqu'au ${parse(f.fin).getDate()} ${MOIS_C[parse(f.fin).getMonth()]}` : "1 jour";
   return `<button class="item" data-edit="formation" data-id="${f.id}">
     ${dateBlock(f.debut, "var(--muted)")}
-    <div class="main"><div class="t">${esc(f.intitule)}${exTag(f)}</div><div class="s">${esc(f.lieu)} · ${range}</div></div>
+    <div class="main"><div class="t">${esc(f.intitule)}${exTag(f)}</div><div class="s">${f.lieu ? esc(f.lieu) + " · " : ""}${range}${(() => { const n = formationDays(f).length; return n ? ` · ${n} j · ${fmtH(n * formationMinPerDay(f))}` : ""; })()}</div></div>
     <span class="pill ${st[0]}">${st[1]}</span></button>`;
 }
 const listOr = (items, fn, empty) => `<div class="list">${items.length ? items.map(fn).join("") : `<div class="empty">${empty}</div>`}</div>`;
@@ -485,11 +492,70 @@ function exampleBanner() {
     <button class="btn" id="clearEx">Effacer les exemples</button></div>`;
 }
 
+/* ---------- Temps de service : vacations + formations, plafond annuel ---------- */
+function formationDays(f) {
+  if (f.statut === "annule" || f.compte === false) return [];
+  const out = [], end = f.fin || f.debut;
+  for (let d = f.debut; d <= end && out.length < 400; d = addDays(d, 1)) {
+    const wd = parse(d).getDay();
+    if (f.weekend || (wd !== 0 && wd !== 6)) out.push(d);
+  }
+  return out;
+}
+const formationMinPerDay = f => Math.round((f.heuresJour === undefined || f.heuresJour === "" ? 7 : Number(f.heuresJour) || 0) * 60);
+function serviceUnits() {
+  const u = db.vacations.map(v => ({ date: v.date, min: duration(v.debut, v.fin, v.pause), kind: "vacation" }));
+  db.formations.forEach(f => { const m = formationMinPerDay(f); formationDays(f).forEach(d => u.push({ date: d, min: m, kind: "formation" })); });
+  return u;
+}
+function contractPeriod(ref = todayIso()) {
+  const c = db.settings.contratDebut;
+  if (!c) return null;
+  const [, mm, dd] = c.split("-").map(Number);
+  const r = parse(ref);
+  let y = r.getFullYear();
+  const anniv = y2 => iso(new Date(y2, mm - 1, dd));
+  if (ref < anniv(y)) y--;
+  return { start: anniv(y), end: addDays(anniv(y + 1), -1) };
+}
+function contractStats() {
+  const per = contractPeriod();
+  if (!per) return null;
+  const t = todayIso(), cap = Math.round((Number(db.settings.plafond) || 0) * 60);
+  let done = 0, plan = 0, form = 0;
+  serviceUnits().forEach(x => {
+    if (x.date < per.start || x.date > per.end) return;
+    if (x.date <= t) done += x.min; else plan += x.min;
+    if (x.kind === "formation") form += x.min;
+  });
+  return { ...per, cap, done, plan, form, left: cap - done - plan };
+}
+const fmtD = s => { const d = parse(s); return `${d.getDate()} ${MOIS_C[d.getMonth()]} ${d.getFullYear()}`; };
+function contractCard() {
+  const c = contractStats();
+  if (!c) return `<div class="card"><h2>Plafond annuel</h2>
+    <span class="hint">Renseignez la date de début de votre contrat pour suivre vos heures sur chaque année de contrat.</span>
+    <div class="row2"><div class="field"><label for="cDeb">Début du contrat</label><input id="cDeb" type="date"></div>
+    <div class="field"><label for="cCap">Plafond (heures)</label><input id="cCap" type="number" min="0" step="1" inputmode="numeric" value="${esc(db.settings.plafond)}"></div></div></div>`;
+  const pct = x => c.cap ? Math.max(0, Math.min(100, x / c.cap * 100)) : 0;
+  const over = c.left < 0;
+  return `<div class="card">
+    <div class="section-head"><h2>Plafond ${parse(c.start).getFullYear()}–${parse(c.end).getFullYear()}</h2><span class="mono">${fmtH(c.done)} / ${fmtH(c.cap)}</span></div>
+    <div class="progress"><i style="width:${pct(c.done)}%"></i><i class="plan" style="width:${pct(c.plan)}%"></i>${over ? `<i class="over" style="width:4%"></i>` : ""}</div>
+    <div class="hint">Du ${fmtD(c.start)} au ${fmtD(c.end)} · effectuées ${fmtH(c.done)} · programmées ${fmtH(c.plan)}${c.form ? ` · dont formation ${fmtH(c.form)}` : ""}</div>
+    <span class="pill ${over ? "crit" : c.left < 7 * 60 ? "warn" : "ok"}" style="align-self:flex-start">${over ? `Dépassement de ${fmtH(-c.left)}` : `Reste ${fmtH(c.left)} à programmer`}</span>
+  </div>`;
+}
+
 function renderAccueil() {
   const t = todayIso(), y = new Date().getFullYear(), m = new Date().getMonth();
-  const inMonth = db.vacations.filter(v => { const d = parse(v.date); return d.getFullYear() === y && d.getMonth() === m; });
-  const inYear = db.vacations.filter(v => parse(v.date).getFullYear() === y && v.date <= t);
-  const minYear = inYear.reduce((a, v) => a + duration(v.debut, v.fin, v.pause), 0);
+  const units = serviceUnits();
+  const monthKey = `${y}-${pad(m + 1)}`;
+  const daysMonth = new Set(units.filter(x => x.date.startsWith(monthKey)).map(x => x.date)).size;
+  const cs = contractStats();
+  const doneUnits = units.filter(x => x.date <= t && (cs ? x.date >= cs.start : x.date.startsWith(String(y))));
+  const doneMin = doneUnits.reduce((a, x) => a + x.min, 0);
+  const doneDays = new Set(doneUnits.map(x => x.date)).size;
   const upcoming = [
     ...db.vacations.filter(v => v.date >= t).map(v => ({ d: v.date, html: vacItem(v) })),
     ...db.tirs.filter(x => x.date >= t && x.statut !== "fait").map(x => ({ d: x.date, html: tirItem(x) })),
@@ -499,10 +565,12 @@ function renderAccueil() {
   const obj = Number(db.settings.tirObjectif) || 0;
   return `${exampleBanner()}
   <div class="stats">
-    <div class="stat"><b>${inMonth.length}</b><span>Vacations en ${MOIS[m]}</span></div>
-    <div class="stat"><b>${inYear.length}</b><span>Jours effectués ${y}</span></div>
-    <div class="stat"><b>${fmtH(minYear)}</b><span>Heures effectives ${y}</span></div>
+    <div class="stat"><b>${daysMonth}</b><span>Jours de service en ${MOIS[m]}</span></div>
+    <div class="stat"><b>${doneDays}</b><span>Jours effectués ${cs ? "ce contrat" : y}</span></div>
+    ${cs ? `<div class="stat"><b>${fmtH(Math.max(0, cs.left))}</b><span>Heures restantes sur ${fmtH(cs.cap)}</span></div>`
+         : `<div class="stat"><b>${fmtH(doneMin)}</b><span>Heures effectuées ${y}</span></div>`}
   </div>
+  ${contractCard()}
   ${calendar()}
   <div class="section-head"><h2>À venir</h2><button class="btn" id="calAll">Tout ajouter à l'agenda</button></div>
   ${upcoming.length ? `<div class="list">${upcoming.map(u => u.html).join("")}</div>` : `<div class="list"><div class="empty">Rien de programmé. Touchez + pour ajouter une vacation.</div></div>`}
@@ -603,6 +671,12 @@ function renderServices() {
     <div class="field"><label for="pSous">Sous-titre</label><input id="pSous" value="${esc(db.settings.sousTitre)}" placeholder="Facultatif"></div>
   </div>
   <div class="card">
+    <h2>Contrat</h2>
+    <span class="hint">Le plafond se remet à zéro chaque année à la date anniversaire du contrat. Vacations et formations comptées comme temps de vacation y sont incluses.</span>
+    <div class="row2"><div class="field"><label for="cDeb">Début du contrat</label><input id="cDeb" type="date" value="${esc(db.settings.contratDebut || "")}"></div>
+    <div class="field"><label for="cCap">Plafond (heures)</label><input id="cCap" type="number" min="0" step="1" inputmode="numeric" value="${esc(db.settings.plafond)}"></div></div>
+  </div>
+  <div class="card">
     <h2>Sécurité</h2>
     <span class="hint">Vos données sont chiffrées sur cet iPhone. Le carnet se verrouille après 1 min en arrière-plan ou 5 min sans action.</span>
     <div class="actions" style="justify-content:flex-start">
@@ -683,7 +757,7 @@ function vacationForm(v, presetDate) {
       <div class="field"><label for="vFin">Fin</label><input id="vFin" name="fin" type="time" value="${v.fin}"></div>
       <div class="field"><label for="vPause">Pause (min)</label><input id="vPause" name="pause" type="number" min="0" step="5" inputmode="numeric" value="${v.pause}"></div>
     </div>
-    <div class="calc"><span class="hint">Durée effective</span><b id="vDur">${fmtH(duration(v.debut, v.fin, v.pause))}</b></div>
+    <div class="calc" id="vCalc"><span class="hint">Durée effective<span class="sub" id="vLeft"></span></span><b id="vDur">${fmtH(duration(v.debut, v.fin, v.pause))}</b></div>
     <div class="field"><label for="vSvc">Service d'affectation</label><select id="vSvc" name="serviceId">
       ${db.services.map(s => opt(s.id, v.serviceId, s.nom + (s.unite ? " · " + s.unite : ""))).join("")}${opt("", v.serviceId, "— Non renseigné —")}</select></div>
     <div class="field"><label for="vNote">Note</label><textarea id="vNote" name="note" placeholder="Équipage, mission, indicatif…">${esc(v.note)}</textarea></div>`;
@@ -691,8 +765,19 @@ function vacationForm(v, presetDate) {
     if (!d.date) return "Indiquez la date de la vacation.";
     return upsert(db.vacations, { ...v, ...d, pause: Number(d.pause) || 0, example: false });
   }, isNew ? null : () => { db.vacations = db.vacations.filter(x => x.id !== v.id); }, "vacation", isNew ? null : v);
-  const upd = () => { document.getElementById("vDur").textContent = fmtH(duration(f.debut.value, f.fin.value, f.pause.value)); };
-  ["debut","fin","pause"].forEach(n => f[n].addEventListener("input", upd));
+  const upd = () => {
+    const dur = duration(f.debut.value, f.fin.value, f.pause.value);
+    document.getElementById("vDur").textContent = fmtH(dur);
+    const per = f.date.value ? contractPeriod(f.date.value) : null, el = document.getElementById("vLeft");
+    if (!per) { el.textContent = ""; return; }
+    const cap = Math.round((Number(db.settings.plafond) || 0) * 60);
+    const used = serviceUnits().filter(x => x.date >= per.start && x.date <= per.end).reduce((a, x) => a + x.min, 0)
+      - (isNew || v.date < per.start || v.date > per.end ? 0 : duration(v.debut, v.fin, v.pause));
+    const left = cap - used - dur;
+    el.textContent = left >= 0 ? `Il restera ${fmtH(left)} sur ${fmtH(cap)}` : `Dépasse le plafond de ${fmtH(-left)}`;
+    document.getElementById("vCalc").classList.toggle("warn", left < 0);
+  };
+  ["date","debut","fin","pause"].forEach(n => f[n].addEventListener("input", upd)); upd();
 }
 
 function tirForm(t) {
@@ -720,13 +805,26 @@ function formationForm(fo) {
     <div class="field"><label for="fFin">Au</label><input id="fFin" name="fin" type="date" value="${fo.fin || fo.debut}"></div></div>
     <div class="row2"><div class="field"><label for="fLieu">Lieu</label><input id="fLieu" name="lieu" value="${esc(fo.lieu)}"></div>
     <div class="field"><label for="fSt">Statut</label><select id="fSt" name="statut">${opt("prevu", fo.statut, "Programmée")}${opt("fait", fo.statut, "Suivie")}${opt("annule", fo.statut, "Annulée")}</select></div></div>
+    <label class="check"><input type="checkbox" id="fCompte" name="compte" ${fo.compte === false ? "" : "checked"}> Compte comme temps de vacation</label>
+    <div class="row2"><div class="field"><label for="fH">Heures par jour</label><input id="fH" name="heuresJour" type="number" min="0" max="24" step="0.5" inputmode="decimal" value="${fo.heuresJour ?? 7}"></div>
+    <label class="check" style="align-self:end"><input type="checkbox" id="fWe" name="weekend" ${fo.weekend ? "checked" : ""}> Compter samedi et dimanche</label></div>
+    <div class="calc" id="fCalc"></div>
     <div class="field"><label for="fNote">Note</label><textarea id="fNote" name="note">${esc(fo.note)}</textarea></div>`;
-  openSheet(isNew ? "Nouvelle formation" : "Formation", body, d => {
+  const read = d => ({ ...fo, ...d, fin: d.fin || d.debut, compte: d.compte === "on", weekend: d.weekend === "on", heuresJour: Number(d.heuresJour) || 0, example: false });
+  const f = openSheet(isNew ? "Nouvelle formation" : "Formation", body, d => {
     if (!d.intitule.trim()) return "Indiquez l'intitulé de la formation.";
     if (!d.debut) return "Indiquez la date de début.";
     if (d.fin && d.fin < d.debut) return "La date de fin précède la date de début.";
-    return upsert(db.formations, { ...fo, ...d, fin: d.fin || d.debut, example: false });
+    return upsert(db.formations, read(d));
   }, isNew ? null : () => { db.formations = db.formations.filter(x => x.id !== fo.id); }, "formation", isNew ? null : fo);
+  const upd = () => {
+    const o = read(Object.fromEntries(new FormData(f)));
+    const n = o.debut && (!o.fin || o.fin >= o.debut) ? formationDays(o).length : 0;
+    document.getElementById("fCalc").innerHTML = o.compte
+      ? `<span class="hint">Temps de vacation<span class="sub">${n} jour${n > 1 ? "s" : ""} × ${fmtH(formationMinPerDay(o))}</span></span><b>${fmtH(n * formationMinPerDay(o))}</b>`
+      : `<span class="hint">Non comptée dans vos heures</span><b>0h00</b>`;
+  };
+  f.addEventListener("input", upd); f.addEventListener("change", upd); upd();
 }
 
 function serviceForm(s) {
@@ -823,6 +921,8 @@ view.addEventListener("click", e => {
 });
 view.addEventListener("change", e => {
   if (e.target.id === "tirObj") { db.settings.tirObjectif = Math.max(0, Number(e.target.value) || 0); save(); render(); }
+  if (e.target.id === "cDeb") { db.settings.contratDebut = e.target.value; save(); render(); toast("Enregistré"); }
+  if (e.target.id === "cCap") { db.settings.plafond = Math.max(0, Number(e.target.value) || 0); save(); render(); toast("Enregistré"); }
   if (e.target.id === "pTitre" || e.target.id === "pSous") {
     db.settings[e.target.id === "pTitre" ? "titre" : "sousTitre"] = e.target.value.trim(); save(); render(); toast("Enregistré");
   }
